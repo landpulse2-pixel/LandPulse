@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Trophy, Timer, Users, RotateCcw, AlertTriangle, Zap, Gauge } from 'lucide-react';
+import { Loader2, Trophy, Timer, Users, RotateCcw, Zap, Gauge } from 'lucide-react';
 
 // Types
 interface GameState {
@@ -12,8 +12,7 @@ interface GameState {
   playerScore: number;
   opponentScore: number;
   timeLeft: number;
-  playerLane: number;
-  rpm: number; // Tours par minute (0-10000)
+  rpm: number; // 0-10000
   currentGear: number; // 1 à 6
   rpmDirection: 'up' | 'down';
   rpmSpeed: number;
@@ -24,19 +23,19 @@ interface GameState {
   speedLevel: number;
   showShiftWarning: boolean;
   roadOffset: number;
-  nitroFuel: number;
   combo: number;
   maxCombo: number;
+  motoX: number; // Position horizontale de la moto pour effet de virage
 }
 
 // Configuration des vitesses
 const GEARS = [
-  { name: '1ère', maxRpm: 8000, optimalMin: 6500, optimalMax: 7500 },
-  { name: '2ème', maxRpm: 8500, optimalMin: 7000, optimalMax: 8000 },
-  { name: '3ème', maxRpm: 9000, optimalMin: 7500, optimalMax: 8500 },
-  { name: '4ème', maxRpm: 9500, optimalMin: 8000, optimalMax: 9000 },
-  { name: '5ème', maxRpm: 9800, optimalMin: 8500, optimalMax: 9500 },
-  { name: '6ème', maxRpm: 10000, optimalMin: 9000, optimalMax: 9800 },
+  { name: '1', maxRpm: 8000, optimalMin: 6500, optimalMax: 7500 },
+  { name: '2', maxRpm: 8500, optimalMin: 7000, optimalMax: 8000 },
+  { name: '3', maxRpm: 9000, optimalMin: 7500, optimalMax: 8500 },
+  { name: '4', maxRpm: 9500, optimalMin: 8000, optimalMax: 9000 },
+  { name: '5', maxRpm: 9800, optimalMin: 8500, optimalMax: 9500 },
+  { name: '6', maxRpm: 10000, optimalMin: 9000, optimalMax: 9800 },
 ];
 
 // Récompenses
@@ -48,20 +47,12 @@ const VICTORY_REWARDS = [
   { victories: 50, reward: 400 },
 ];
 
-// Zones de scoring
-const SCORE_ZONES = {
-  perfect: { min: 0, max: 500, points: 100, label: 'PARFAIT! 🔥', color: 'text-green-400' },
-  good: { min: 500, max: 1500, points: 50, label: 'BIEN! 👍', color: 'text-yellow-400' },
-  bad: { min: 1500, max: 3000, points: -20, label: 'RATÉ 😵', color: 'text-red-400' },
-};
-
 export function MotoCourse() {
   const [gameState, setGameState] = useState<GameState>({
     phase: 'waiting',
     playerScore: 0,
     opponentScore: 0,
     timeLeft: 60,
-    playerLane: 1,
     rpm: 2000,
     currentGear: 1,
     rpmDirection: 'up',
@@ -73,9 +64,9 @@ export function MotoCourse() {
     speedLevel: 1,
     showShiftWarning: false,
     roadOffset: 0,
-    nitroFuel: 100,
     combo: 0,
     maxCombo: 0,
+    motoX: 50,
   });
 
   const gameLoopRef = useRef<NodeJS.Timeout | null>(null);
@@ -113,7 +104,6 @@ export function MotoCourse() {
         playerScore: 0,
         opponentScore: 0,
         timeLeft: 60,
-        playerLane: 1,
         rpm: 2000,
         currentGear: 1,
         rpmDirection: 'up',
@@ -121,9 +111,9 @@ export function MotoCourse() {
         lastShift: null,
         speedLevel: 1,
         roadOffset: 0,
-        nitroFuel: 100,
         combo: 0,
         maxCombo: 0,
+        motoX: 50,
       }));
     }, 2000 + Math.random() * 1000);
 
@@ -169,23 +159,17 @@ export function MotoCourse() {
     rpmLoopRef.current = setInterval(() => {
       setGameState(prev => {
         const gear = GEARS[prev.currentGear - 1];
-        const optimalZone = gear.optimalMax - gear.optimalMin;
-        
-        // La vitesse augmente avec le niveau
-        const baseSpeed = prev.rpmSpeed + (prev.speedLevel * 10);
+        const baseSpeed = prev.rpmSpeed + (prev.speedLevel * 8);
         
         let newRpm = prev.rpm;
         let newDirection = prev.rpmDirection;
-        let newGear = prev.currentGear;
         let warning = false;
         
         if (prev.rpmDirection === 'up') {
-          newRpm += baseSpeed / 10;
+          newRpm += baseSpeed / 8;
           
-          // Si on atteint le max, on perd des points (sur-régime)
           if (newRpm >= gear.maxRpm) {
             newRpm = gear.maxRpm;
-            // Pénalité pour sur-régime
             return {
               ...prev,
               rpm: newRpm,
@@ -197,28 +181,29 @@ export function MotoCourse() {
             };
           }
           
-          // Alerte quand on approche de la zone optimale
-          if (newRpm >= gear.optimalMin - 500) {
+          if (newRpm >= gear.optimalMin - 300) {
             warning = true;
           }
         } else {
-          // RPM descend après un passage de vitesse raté
-          newRpm -= baseSpeed / 5;
+          newRpm -= baseSpeed / 4;
           if (newRpm <= 2000) {
             newRpm = 2000;
             newDirection = 'up';
           }
         }
         
+        // Effet de virage subtil
+        const newMotoX = 50 + Math.sin(Date.now() / 1000) * 3;
+        
         return {
           ...prev,
           rpm: newRpm,
           rpmDirection: newDirection,
-          currentGear: newGear,
           showShiftWarning: warning,
+          motoX: newMotoX,
         };
       });
-    }, 30);
+    }, 25);
 
     return () => {
       if (rpmLoopRef.current) clearInterval(rpmLoopRef.current);
@@ -231,7 +216,7 @@ export function MotoCourse() {
 
     roadLoopRef.current = setInterval(() => {
       setGameState(prev => {
-        const speed = (prev.rpm / 10000) * 15 * prev.currentGear;
+        const speed = (prev.rpm / 10000) * 20 * prev.currentGear;
         return {
           ...prev,
           roadOffset: (prev.roadOffset + speed) % 100,
@@ -253,19 +238,13 @@ export function MotoCourse() {
 
     opponentLoopRef.current = setInterval(() => {
       setGameState(prev => {
-        // L'IA a des performances variables
         const luck = Math.random();
-        let scoreGain = 15; // Base
+        let scoreGain = 15;
         
-        if (luck > 0.7) {
-          scoreGain = 80; // Parfait
-        } else if (luck > 0.4) {
-          scoreGain = 45; // Bien
-        } else if (luck > 0.2) {
-          scoreGain = 20; // Moyen
-        } else {
-          scoreGain = -10; // Raté
-        }
+        if (luck > 0.7) scoreGain = 80;
+        else if (luck > 0.4) scoreGain = 45;
+        else if (luck > 0.2) scoreGain = 20;
+        else scoreGain = -10;
         
         return {
           ...prev,
@@ -279,7 +258,7 @@ export function MotoCourse() {
     };
   }, [gameState.phase]);
 
-  // Effacer le feedback de passage
+  // Effacer le feedback
   useEffect(() => {
     if (gameState.lastShift) {
       const timer = setTimeout(() => {
@@ -310,38 +289,28 @@ export function MotoCourse() {
       
       let points = 0;
       let zone: 'perfect' | 'good' | 'bad' = 'bad';
-      let label = '';
-      let color = '';
       
       if (distanceFromOptimal <= 250) {
         points = 100 + prev.combo * 10;
         zone = 'perfect';
-        label = 'PARFAIT! 🔥';
-        color = 'text-green-400';
       } else if (distanceFromOptimal <= 800) {
         points = 50;
         zone = 'good';
-        label = 'BIEN! 👍';
-        color = 'text-yellow-400';
       } else {
         points = -20;
         zone = 'bad';
-        label = 'RATÉ 😵';
-        color = 'text-red-400';
       }
       
       const newGear = prev.currentGear + 1;
       const newGearConfig = GEARS[newGear - 1];
       const newCombo = zone !== 'bad' ? prev.combo + 1 : 0;
       const newMaxCombo = Math.max(prev.maxCombo, newCombo);
-      
-      // Bonus combo
       const comboBonus = newCombo >= 3 ? newCombo * 5 : 0;
       
       return {
         ...prev,
         currentGear: newGear,
-        rpm: newGearConfig.optimalMin - 500, // RPM retombe au début de la zone
+        rpm: newGearConfig.optimalMin - 500,
         rpmDirection: 'up',
         playerScore: Math.max(0, prev.playerScore + points + comboBonus),
         lastShift: { gear: prev.currentGear, points: points + comboBonus, zone },
@@ -350,32 +319,6 @@ export function MotoCourse() {
         showShiftWarning: false,
       };
     });
-  }, []);
-
-  // Rétrograder (en cas d'erreur)
-  const downshift = useCallback(() => {
-    setGameState(prev => {
-      if (prev.phase !== 'playing' || prev.currentGear <= 1) return prev;
-      
-      const newGear = prev.currentGear - 1;
-      const newGearConfig = GEARS[newGear - 1];
-      
-      return {
-        ...prev,
-        currentGear: newGear,
-        rpm: newGearConfig.optimalMax,
-        rpmDirection: 'down',
-        combo: 0,
-      };
-    });
-  }, []);
-
-  // Changer de voie
-  const moveLane = useCallback((direction: -1 | 1) => {
-    setGameState(prev => ({
-      ...prev,
-      playerLane: Math.max(0, Math.min(2, prev.playerLane + direction)),
-    }));
   }, []);
 
   // Démarrer avec pub
@@ -407,26 +350,26 @@ export function MotoCourse() {
     return null;
   };
 
-  // Calculer la couleur du RPM
-  const getRpmColor = (rpm: number) => {
-    const gear = GEARS[gameState.currentGear - 1];
-    if (rpm >= gear.optimalMin && rpm <= gear.optimalMax) {
-      return 'text-green-400';
-    } else if (rpm >= gear.optimalMin - 500 || rpm >= gear.optimalMax) {
-      return 'text-yellow-400';
-    } else if (rpm >= gear.maxRpm - 500) {
-      return 'text-red-500 animate-pulse';
-    }
-    return 'text-white';
+  // Calculer la rotation de l'aiguille (-135° à +135°)
+  const getNeedleRotation = () => {
+    const minAngle = -135;
+    const maxAngle = 135;
+    const totalDegrees = maxAngle - minAngle;
+    const percentage = (gameState.rpm - 1000) / 9000; // 1000 à 10000 RPM
+    return minAngle + (percentage * totalDegrees);
   };
 
-  // Calculer la position de l'aiguille
-  const getNeedleRotation = () => {
-    const maxRotation = 270; // degrés
-    const minRotation = -45;
+  // Position de la zone optimale sur le cadran
+  const getOptimalZoneStyle = () => {
     const gear = GEARS[gameState.currentGear - 1];
-    const percentage = Math.min(1, gameState.rpm / gear.maxRpm);
-    return minRotation + (percentage * maxRotation);
+    const startAngle = -135 + ((gear.optimalMin - 1000) / 9000) * 270;
+    const endAngle = -135 + ((gear.optimalMax - 1000) / 9000) * 270;
+    const arcAngle = endAngle - startAngle;
+    
+    return {
+      startAngle,
+      arcAngle,
+    };
   };
 
   return (
@@ -438,7 +381,7 @@ export function MotoCourse() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-orange-400 to-red-600 flex items-center justify-center shadow-lg shadow-orange-500/30">
-                  <span className="text-xl">🏍️</span>
+                  <Gauge className="h-5 w-5 text-white" />
                 </div>
                 <div>
                   <h2 className="text-lg font-bold text-orange-400">Moto Drag Race</h2>
@@ -485,27 +428,12 @@ export function MotoCourse() {
                 <div className="bg-gray-900/50 rounded-lg p-4 mb-4 text-left max-w-md mx-auto">
                   <h4 className="font-semibold text-orange-400 mb-2">🎮 Comment jouer :</h4>
                   <ul className="text-sm text-muted-foreground space-y-2">
-                    <li>• Le <strong className="text-green-400">compte-tour monte</strong> automatiquement</li>
+                    <li>• L&apos;aiguille du <strong className="text-orange-400">compte-tour monte</strong> automatiquement</li>
                     <li>• Appuyez sur <strong className="text-orange-400">PASSER</strong> dans la <strong className="text-green-400">zone verte</strong></li>
                     <li>• <strong className="text-green-400">Parfait</strong> = +100 pts | <strong className="text-yellow-400">Bien</strong> = +50 pts</li>
-                    <li>• <strong className="text-red-400">Raté</strong> = -20 pts et perte du combo</li>
+                    <li>• <strong className="text-red-400">Raté</strong> = -20 pts</li>
                     <li>• Enchaînez les passages parfaits pour un <strong className="text-yellow-400">bonus combo</strong> !</li>
                   </ul>
-                </div>
-                
-                <div className="flex justify-center gap-4 mb-4">
-                  <div className="text-center px-3 py-2 rounded-lg bg-green-500/20 border border-green-500/30">
-                    <div className="text-2xl mb-1">🎯</div>
-                    <div className="text-xs text-green-400">Zone optimale</div>
-                  </div>
-                  <div className="text-center px-3 py-2 rounded-lg bg-yellow-500/20 border border-yellow-500/30">
-                    <div className="text-2xl mb-1">⚠️</div>
-                    <div className="text-xs text-yellow-400">Attention</div>
-                  </div>
-                  <div className="text-center px-3 py-2 rounded-lg bg-red-500/20 border border-red-500/30">
-                    <div className="text-2xl mb-1">💥</div>
-                    <div className="text-xs text-red-400">Sur-régime</div>
-                  </div>
                 </div>
 
                 <Button 
@@ -586,155 +514,199 @@ export function MotoCourse() {
                     </div>
                   </div>
                   
-                  {/* Vitesse actuelle */}
                   <div className="flex items-center gap-2 bg-orange-500/20 px-3 py-1 rounded-full">
-                    <Gauge className="h-4 w-4 text-orange-400" />
-                    <span className="text-sm font-bold text-orange-400">{GEARS[gameState.currentGear - 1].name}</span>
+                    <span className="text-sm font-bold text-orange-400">V{gameState.currentGear}</span>
                   </div>
                 </div>
 
-                {/* Zone de jeu - Vue arrière 3D */}
+                {/* Zone de jeu - Moto vue de côté avec route */}
                 <div 
                   className="moto-game-area relative rounded-xl overflow-hidden border-2 border-gray-600"
-                  style={{ height: '320px', touchAction: 'auto' }}
+                  style={{ height: '200px', touchAction: 'auto' }}
                 >
-                  {/* Ciel et horizon */}
-                  <div className="absolute inset-0 bg-gradient-to-b from-sky-900 via-sky-800 to-gray-700" />
+                  {/* Fond route */}
+                  <div className="absolute inset-0 bg-gradient-to-b from-gray-700 via-gray-800 to-gray-900">
+                    {/* Lignes de route animées */}
+                    {[...Array(12)].map((_, i) => (
+                      <div
+                        key={i}
+                        className="absolute left-1/2 -translate-x-1/2 w-2 h-10 bg-yellow-400 rounded"
+                        style={{
+                          top: `${((i * 9) + gameState.roadOffset) % 120 - 10}%`,
+                          opacity: 0.6,
+                        }}
+                      />
+                    ))}
+                  </div>
                   
-                  {/* Soleil couchant */}
-                  <div className="absolute top-6 left-1/2 -translate-x-1/2 w-16 h-8 bg-gradient-to-b from-orange-400 to-yellow-500 rounded-full blur-sm opacity-60" />
-                  
-                  {/* Route avec perspective */}
-                  <div className="absolute bottom-0 left-0 right-0 h-[70%]">
-                    <div 
-                      className="absolute inset-x-[15%] bottom-0 h-full"
-                      style={{
-                        background: 'linear-gradient(180deg, #374151 0%, #1f2937 100%)',
-                        clipPath: 'polygon(35% 0%, 65% 0%, 100% 100%, 0% 100%)',
-                      }}
-                    >
-                      {/* Lignes de route animées */}
-                      {[...Array(8)].map((_, i) => {
-                        const offset = ((i * 12.5 + gameState.roadOffset) % 100);
-                        const perspective = offset / 100;
-                        const y = perspective * 100;
-                        const width = 15 + perspective * 50;
-                        
-                        return (
-                          <div
-                            key={i}
-                            className="absolute left-1/2 h-1 bg-yellow-400 rounded"
-                            style={{
-                              top: `${y}%`,
-                              width: `${width}%`,
-                              transform: 'translateX(-50%)',
-                              opacity: 0.5 + perspective * 0.5,
-                            }}
-                          />
-                        );
-                      })}
-                    </div>
-                    
-                    {/* Herbe */}
-                    <div className="absolute bottom-0 left-0 w-[20%] h-full bg-gradient-to-t from-green-800 to-green-900" />
-                    <div className="absolute bottom-0 right-0 w-[20%] h-full bg-gradient-to-t from-green-800 to-green-900" />
+                  {/* Lignes de voie */}
+                  <div className="absolute inset-0 flex justify-around pointer-events-none">
+                    <div className="w-px h-full bg-white/10" />
+                    <div className="w-px h-full bg-white/10" />
                   </div>
 
-                  {/* Moto vue de derrière (immersive) */}
+                  {/* Moto vue de côté */}
                   <div
-                    className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20"
+                    className="absolute transition-all duration-100"
+                    style={{
+                      left: `${gameState.motoX}%`,
+                      bottom: '15%',
+                      transform: 'translateX(-50%)',
+                      fontSize: '4rem',
+                      filter: gameState.rpm > 8000 ? 'drop-shadow(0 0 20px orange)' : 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))',
+                    }}
                   >
-                    {/* Corps du motard */}
-                    <div className="relative">
-                      {/* Silhouette du motard de dos */}
-                      <div className="text-7xl transform -scale-x-100" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }}>
-                        🏍️
-                      </div>
-                      {/* Effet de vitesse */}
-                      {gameState.rpm > 7000 && (
-                        <>
-                          <div className="absolute -left-6 top-1/3 w-4 h-0.5 bg-white/30 blur-sm" />
-                          <div className="absolute -right-6 top-1/3 w-4 h-0.5 bg-white/30 blur-sm" />
-                        </>
-                      )}
-                    </div>
+                    🏍️
+                    {/* Effet de vitesse */}
+                    {gameState.rpm > 6000 && (
+                      <div className="absolute -left-4 top-1/2 w-3 h-0.5 bg-white/40 blur-sm" />
+                    )}
                   </div>
-
+                  
                   {/* Feedback de passage */}
                   {gameState.lastShift && (
-                    <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center z-30 animate-bounce">
-                      <div className={`text-2xl font-black ${gameState.lastShift.zone === 'perfect' ? 'text-green-400' : gameState.lastShift.zone === 'good' ? 'text-yellow-400' : 'text-red-400'}`}>
+                    <div className="absolute top-1/4 left-1/2 -translate-x-1/2 text-center z-30 animate-bounce">
+                      <div className={`text-xl font-black ${gameState.lastShift.zone === 'perfect' ? 'text-green-400' : gameState.lastShift.zone === 'good' ? 'text-yellow-400' : 'text-red-400'}`}>
                         {gameState.lastShift.zone === 'perfect' && '🔥 PARFAIT!'}
                         {gameState.lastShift.zone === 'good' && '👍 BIEN!'}
                         {gameState.lastShift.zone === 'bad' && '😵 RATÉ'}
                       </div>
-                      <div className={`text-lg font-bold ${gameState.lastShift.points > 0 ? 'text-green-300' : 'text-red-300'}`}>
+                      <div className={`text-sm font-bold ${gameState.lastShift.points > 0 ? 'text-green-300' : 'text-red-300'}`}>
                         {gameState.lastShift.points > 0 ? '+' : ''}{gameState.lastShift.points}
                       </div>
                     </div>
                   )}
                   
-                  {/* Warning zone optimale */}
+                  {/* Warning */}
                   {gameState.showShiftWarning && (
-                    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30">
-                      <div className="bg-green-500/30 border border-green-500/50 px-3 py-1 rounded-full animate-pulse">
-                        <span className="text-green-400 font-bold text-sm">PASSER MAINTENANT!</span>
+                    <div className="absolute top-2 left-1/2 -translate-x-1/2 z-30">
+                      <div className="bg-green-500/30 border border-green-500/50 px-2 py-0.5 rounded-full animate-pulse">
+                        <span className="text-green-400 font-bold text-xs">PASSER!</span>
                       </div>
                     </div>
                   )}
                 </div>
 
-                {/* Compte-tour (Tachymètre) */}
-                <div className="flex gap-3">
-                  {/* Jauge RPM */}
-                  <div className="flex-1 bg-gray-900 rounded-xl p-3 border border-gray-700">
-                    <div className="text-center mb-2">
-                      <span className="text-xs text-muted-foreground">Compte-tour</span>
-                      <div className={`text-2xl font-mono font-bold ${getRpmColor(gameState.rpm)}`}>
-                        {Math.round(gameState.rpm)} <span className="text-sm">RPM</span>
-                      </div>
-                    </div>
-                    
-                    {/* Barre de RPM avec zone optimale */}
-                    <div className="relative h-8 bg-gray-800 rounded-lg overflow-hidden">
-                      {/* Zones de couleur */}
-                      <div className="absolute inset-0 flex">
-                        <div className="w-[20%] bg-gray-700" /> {/* Bas régime */}
-                        <div className="w-[30%] bg-yellow-600/30" /> {/* Zone attention */}
-                        <div className="w-[35%] bg-green-600/40" /> {/* Zone optimale */}
-                        <div className="w-[15%] bg-red-600/50" /> {/* Sur-régime */}
-                      </div>
-                      
-                      {/* Zone optimale mise en évidence */}
-                      <div 
-                        className="absolute h-full bg-green-500/20 border-x-2 border-green-400"
-                        style={{
-                          left: `${((GEARS[gameState.currentGear - 1].optimalMin - 2000) / 8000) * 100}%`,
-                          width: `${((GEARS[gameState.currentGear - 1].optimalMax - GEARS[gameState.currentGear - 1].optimalMin) / 8000) * 100}%`,
-                        }}
-                      />
-                      
-                      {/* Indicateur RPM actuel */}
-                      <div 
-                        className="absolute top-0 bottom-0 w-1 bg-white shadow-lg shadow-white/50"
-                        style={{ left: `${((gameState.rpm - 2000) / 8000) * 100}%` }}
-                      />
-                    </div>
-                    
-                    {/* Indicateur de vitesse */}
-                    <div className="flex justify-between mt-2 text-xs text-muted-foreground">
-                      <span>2K</span>
-                      <span className="text-green-400 font-bold">OPTIMAL</span>
-                      <span>10K</span>
+                {/* Compte-tour circulaire avec aiguille */}
+                <div className="flex gap-3 items-center">
+                  {/* Indicateur vitesse */}
+                  <div className="w-16 h-16 rounded-full bg-gray-900 border-2 border-orange-500/50 flex flex-col items-center justify-center">
+                    <span className="text-xs text-muted-foreground">Vit.</span>
+                    <span className="text-2xl font-black text-orange-400">{gameState.currentGear}</span>
+                  </div>
+                  
+                  {/* Compte-tour circulaire */}
+                  <div className="flex-1 bg-gray-900 rounded-xl p-4 border border-gray-700">
+                    <div className="relative w-full aspect-[2/1] flex items-end justify-center">
+                      {/* Cadran du compte-tour (demi-cercle) */}
+                      <svg viewBox="0 0 200 110" className="w-full h-full">
+                        {/* Fond du cadran */}
+                        <path
+                          d="M 20 100 A 80 80 0 0 1 180 100"
+                          fill="none"
+                          stroke="#374151"
+                          strokeWidth="20"
+                          strokeLinecap="round"
+                        />
+                        
+                        {/* Zone rouge (sur-régime) */}
+                        <path
+                          d="M 160 35 A 80 80 0 0 1 180 100"
+                          fill="none"
+                          stroke="#dc2626"
+                          strokeWidth="20"
+                          strokeLinecap="round"
+                          opacity="0.8"
+                        />
+                        
+                        {/* Zone optimale (verte) - dynamique selon la vitesse */}
+                        {(() => {
+                          const gear = GEARS[gameState.currentGear - 1];
+                          const startAngle = Math.PI - ((gear.optimalMin - 1000) / 9000) * Math.PI;
+                          const endAngle = Math.PI - ((gear.optimalMax - 1000) / 9000) * Math.PI;
+                          
+                          const startX = 100 + 80 * Math.cos(startAngle);
+                          const startY = 100 - 80 * Math.sin(startAngle);
+                          const endX = 100 + 80 * Math.cos(endAngle);
+                          const endY = 100 - 80 * Math.sin(endAngle);
+                          
+                          const largeArc = 0;
+                          
+                          return (
+                            <path
+                              d={`M ${startX} ${startY} A 80 80 0 ${largeArc} 1 ${endX} ${endY}`}
+                              fill="none"
+                              stroke="#22c55e"
+                              strokeWidth="22"
+                              strokeLinecap="round"
+                              opacity="0.9"
+                              className="animate-pulse"
+                            />
+                          );
+                        })()}
+                        
+                        {/* Graduations */}
+                        {[0, 2, 4, 6, 8, 10].map((num, i) => {
+                          const angle = Math.PI - (i / 5) * Math.PI;
+                          const x = 100 + 65 * Math.cos(angle);
+                          const y = 100 - 65 * Math.sin(angle);
+                          return (
+                            <text
+                              key={num}
+                              x={x}
+                              y={y}
+                              textAnchor="middle"
+                              dominantBaseline="middle"
+                              className="fill-gray-400 text-xs font-bold"
+                            >
+                              {num}
+                            </text>
+                          );
+                        })}
+                        
+                        {/* Aiguille */}
+                        <g transform={`rotate(${getNeedleRotation()}, 100, 100)`}>
+                          <line
+                            x1="100"
+                            y1="100"
+                            x2="100"
+                            y2="35"
+                            stroke="#ffffff"
+                            strokeWidth="3"
+                            strokeLinecap="round"
+                            className="drop-shadow-lg"
+                          />
+                          <circle cx="100" cy="100" r="8" fill="#f97316" stroke="#fff" strokeWidth="2" />
+                        </g>
+                        
+                        {/* Texte RPM */}
+                        <text
+                          x="100"
+                          y="95"
+                          textAnchor="middle"
+                          className={`text-sm font-bold ${gameState.rpm >= GEARS[gameState.currentGear - 1].optimalMin && gameState.rpm <= GEARS[gameState.currentGear - 1].optimalMax ? 'fill-green-400' : gameState.rpm >= 8000 ? 'fill-red-400' : 'fill-white'}`}
+                        >
+                          {Math.round(gameState.rpm / 1000)}K
+                        </text>
+                        <text
+                          x="100"
+                          y="108"
+                          textAnchor="middle"
+                          className="fill-gray-500 text-[8px]"
+                        >
+                          RPM x1000
+                        </text>
+                      </svg>
                     </div>
                   </div>
                   
-                  {/* Indicateur de vitesse actuelle */}
-                  <div className="w-24 bg-gray-900 rounded-xl p-3 border border-gray-700 flex flex-col items-center justify-center">
-                    <span className="text-xs text-muted-foreground">Vitesse</span>
-                    <span className="text-3xl font-black text-orange-400">{gameState.currentGear}</span>
-                    <span className="text-xs text-orange-300">{GEARS[gameState.currentGear - 1].name}</span>
-                  </div>
+                  {/* Indicateur combo */}
+                  {gameState.combo >= 2 && (
+                    <div className="w-16 h-16 rounded-full bg-yellow-500/20 border-2 border-yellow-500/50 flex flex-col items-center justify-center animate-pulse">
+                      <span className="text-xs text-yellow-400">COMBO</span>
+                      <span className="text-xl font-black text-yellow-400">x{gameState.combo}</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Bouton de passage de vitesse */}
@@ -748,16 +720,22 @@ export function MotoCourse() {
                     e.preventDefault();
                     e.stopPropagation();
                   }}
-                  className="w-full py-6 rounded-xl bg-gradient-to-b from-orange-500 to-red-600 border-2 border-orange-400 active:from-orange-400 active:to-red-500 transition-all flex items-center justify-center gap-3 select-none shadow-lg shadow-orange-500/30"
+                  className={`w-full py-5 rounded-xl border-2 transition-all flex items-center justify-center gap-3 select-none shadow-lg ${
+                    gameState.showShiftWarning 
+                      ? 'bg-gradient-to-b from-green-500 to-green-600 border-green-400 shadow-green-500/30 animate-pulse' 
+                      : 'bg-gradient-to-b from-orange-500 to-red-600 border-orange-400 shadow-orange-500/30'
+                  } active:scale-95`}
                 >
                   <Zap className="h-6 w-6 text-white" />
-                  <span className="text-xl font-black text-white">PASSER LA VITESSE</span>
+                  <span className="text-xl font-black text-white">
+                    {gameState.showShiftWarning ? '🎯 PASSER MAINTENANT!' : '⚡ PASSER LA VITESSE ⚡'}
+                  </span>
                   <Zap className="h-6 w-6 text-white" />
                 </button>
                 
                 {/* Instructions */}
                 <p className="text-center text-xs text-muted-foreground">
-                  Appuyez quand l&apos;aiguille est dans la <span className="text-green-400">zone verte</span> !
+                  Appuyez quand l&apos;aiguille est dans la <span className="text-green-400 font-bold">zone verte</span> !
                 </p>
               </div>
             )}
