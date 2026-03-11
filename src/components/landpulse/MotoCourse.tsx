@@ -11,7 +11,7 @@ interface Obstacle {
   id: number;
   lane: number; // 0, 1, 2 (gauche, centre, droite)
   type: 'car' | 'truck' | 'barrier' | 'coin' | 'nitro';
-  y: number;
+  z: number; // Distance : 0 = loin (horizon), 100 = tout près
 }
 
 interface GameState {
@@ -19,13 +19,12 @@ interface GameState {
   playerScore: number;
   opponentScore: number;
   timeLeft: number;
-  playerLane: number; // 0, 1, 2
+  playerLane: number;
   playerSpeed: number;
   obstacles: Obstacle[];
   obstacleId: number;
   roadOffset: number;
   playerCoins: number;
-  opponentCoins: number;
   nitroActive: boolean;
   nitroFuel: number;
   lastHit: { type: string; points: number } | null;
@@ -36,8 +35,10 @@ interface GameState {
   showNitroWarning: boolean;
 }
 
-// Configuration
-const LANE_POSITIONS = [20, 50, 80]; // Pourcentages
+// Positions X des voies (pourcentage depuis le centre)
+const LANE_POSITIONS = [-25, 0, 25]; // gauche, centre, droite
+
+// Types d'obstacles
 const OBSTACLE_TYPES = [
   { type: 'car', emoji: '🚗', points: -8, probability: 0.15 },
   { type: 'truck', emoji: '🚚', points: -12, probability: 0.08 },
@@ -61,13 +62,12 @@ export function MotoCourse() {
     playerScore: 0,
     opponentScore: 0,
     timeLeft: 45,
-    playerLane: 1, // Commence au centre
-    playerSpeed: 3, // Vitesse initiale lente pour mobile
+    playerLane: 1,
+    playerSpeed: 3,
     obstacles: [],
     obstacleId: 0,
     roadOffset: 0,
     playerCoins: 0,
-    opponentCoins: 0,
     nitroActive: false,
     nitroFuel: 100,
     lastHit: null,
@@ -118,7 +118,6 @@ export function MotoCourse() {
         obstacles: [],
         roadOffset: 0,
         playerCoins: 0,
-        opponentCoins: 0,
         nitroActive: false,
         nitroFuel: 100,
         lastHit: null,
@@ -146,7 +145,6 @@ export function MotoCourse() {
           };
         }
         
-        // Augmenter la vitesse toutes les 10 secondes
         const newSpeedLevel = Math.floor((45 - prev.timeLeft) / 10) + 1;
         const speedIncreased = newSpeedLevel > prev.speedLevel;
         
@@ -154,7 +152,7 @@ export function MotoCourse() {
           ...prev, 
           timeLeft: prev.timeLeft - 1,
           speedLevel: newSpeedLevel,
-          playerSpeed: Math.min(3 + (newSpeedLevel - 1) * 1.5, 10), // Progression plus douce
+          playerSpeed: Math.min(3 + (newSpeedLevel - 1) * 1.5, 10),
           showNitroWarning: speedIncreased,
         };
       });
@@ -185,10 +183,10 @@ export function MotoCourse() {
         const speed = prev.nitroActive ? prev.playerSpeed * 2 : prev.playerSpeed;
         return {
           ...prev,
-          roadOffset: (prev.roadOffset + speed) % 100,
+          roadOffset: (prev.roadOffset + speed * 2) % 100,
         };
       });
-    }, 50);
+    }, 30);
 
     return () => {
       if (roadLoopRef.current) clearInterval(roadLoopRef.current);
@@ -201,7 +199,6 @@ export function MotoCourse() {
 
     spawnLoopRef.current = setInterval(() => {
       setGameState(prev => {
-        // Générer 1 obstacle (parfois 2, mais moins souvent)
         const count = Math.random() > 0.85 ? 2 : 1;
         const newObstacles: Obstacle[] = [];
         
@@ -218,7 +215,6 @@ export function MotoCourse() {
             }
           }
           
-          // Éviter de spawn dans la même lane que le précédent
           let lane = Math.floor(Math.random() * 3);
           if (i > 0 && newObstacles.length > 0) {
             while (lane === newObstacles[0].lane) {
@@ -230,17 +226,17 @@ export function MotoCourse() {
             id: prev.obstacleId + i,
             lane,
             type: selectedType.type as Obstacle['type'],
-            y: -10,
+            z: 0, // Commence à l'horizon
           });
         }
         
         return {
           ...prev,
-          obstacles: [...prev.obstacles.slice(-8), ...newObstacles],
+          obstacles: [...prev.obstacles.slice(-12), ...newObstacles],
           obstacleId: prev.obstacleId + count,
         };
       });
-    }, Math.max(600, 1000 - (gameState.speedLevel - 1) * 80)); // Plus lent, min 600ms
+    }, Math.max(500, 900 - (gameState.speedLevel - 1) * 100));
 
     return () => {
       if (spawnLoopRef.current) clearInterval(spawnLoopRef.current);
@@ -255,24 +251,23 @@ export function MotoCourse() {
       setGameState(prev => {
         const speed = prev.nitroActive ? prev.playerSpeed * 1.5 : prev.playerSpeed;
         let scoreChange = 0;
-        let coinsChange = 0;
         let nitroChange = 0;
         let hitInfo = null;
         
+        // Déplacer les obstacles vers le joueur (z augmente)
         const updatedObstacles = prev.obstacles
           .map(obs => ({
             ...obs,
-            y: obs.y + speed * 0.8,
+            z: obs.z + speed * 1.5,
           }))
-          .filter(obs => obs.y < 120);
+          .filter(obs => obs.z < 110); // Supprimer ceux qui sont passés
         
-        // Vérifier les collisions
+        // Vérifier les collisions (quand l'obstacle est proche, z entre 85 et 100)
         for (const obs of updatedObstacles) {
-          if (obs.y >= 70 && obs.y <= 95 && obs.lane === prev.playerLane) {
+          if (obs.z >= 85 && obs.z <= 100 && obs.lane === prev.playerLane) {
             const obsType = OBSTACLE_TYPES.find(o => o.type === obs.type);
             if (obsType) {
               if (obs.type === 'coin') {
-                coinsChange += 1;
                 scoreChange += obsType.points;
                 hitInfo = { type: 'coin', points: obsType.points };
               } else if (obs.type === 'nitro') {
@@ -280,7 +275,6 @@ export function MotoCourse() {
                 scoreChange += obsType.points;
                 hitInfo = { type: 'nitro', points: obsType.points };
               } else {
-                // Obstacle négatif - mais ne pas perdre de points, juste ralentir
                 scoreChange += obsType.points;
                 hitInfo = { type: obs.type, points: obsType.points };
               }
@@ -290,7 +284,7 @@ export function MotoCourse() {
         
         // Retirer les obstacles collectés
         const finalObstacles = updatedObstacles.filter(obs => {
-          if (obs.y >= 70 && obs.y <= 95 && obs.lane === prev.playerLane) {
+          if (obs.z >= 85 && obs.z <= 100 && obs.lane === prev.playerLane) {
             return obs.type !== 'coin' && obs.type !== 'nitro';
           }
           return true;
@@ -303,13 +297,12 @@ export function MotoCourse() {
           ...prev,
           obstacles: finalObstacles,
           playerScore: Math.max(0, prev.playerScore + scoreChange + distanceScore),
-          playerCoins: prev.playerCoins + coinsChange,
           nitroFuel: nitroChange > 0 ? nitroChange : Math.max(0, prev.nitroFuel - (prev.nitroActive ? 2 : 0)),
           nitroActive: nitroChange > 0 ? prev.nitroActive : (prev.nitroFuel <= 0 ? false : prev.nitroActive),
           lastHit: hitInfo,
         };
       });
-    }, 50);
+    }, 40);
 
     return () => clearInterval(moveInterval);
   }, [gameState.phase]);
@@ -323,16 +316,15 @@ export function MotoCourse() {
 
     opponentLoopRef.current = setInterval(() => {
       setGameState(prev => {
-        // L'IA collecte des pièces et évite les obstacles
         const luck = Math.random();
-        let scoreGain = 5; // Base
+        let scoreGain = 5;
         
         if (luck > 0.7) {
-          scoreGain += 15; // Trouve des pièces
+          scoreGain += 15;
         } else if (luck > 0.4) {
           scoreGain += 8;
         } else if (luck < 0.1) {
-          scoreGain -= 5; // Accident
+          scoreGain -= 5;
         }
         
         return {
@@ -357,8 +349,6 @@ export function MotoCourse() {
     }
   }, [gameState.lastHit]);
 
-  // touchAction: 'auto' permet le scroll normal de la page sur mobile
-
   // Contrôles clavier
   useEffect(() => {
     if (gameState.phase !== 'playing') return;
@@ -375,7 +365,6 @@ export function MotoCourse() {
           playerLane: Math.min(2, prev.playerLane + 1),
         }));
       } else if (e.key === ' ' || e.key === 'ArrowUp') {
-        // Activer nitro
         setGameState(prev => ({
           ...prev,
           nitroActive: prev.nitroFuel > 0 ? !prev.nitroActive : false,
@@ -387,7 +376,7 @@ export function MotoCourse() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [gameState.phase]);
 
-  // Changer de lane (direction -1 = gauche, +1 = droite)
+  // Changer de voie
   const moveLane = useCallback((direction: -1 | 1) => {
     setGameState(prev => ({
       ...prev,
@@ -402,9 +391,6 @@ export function MotoCourse() {
       nitroActive: prev.nitroFuel > 0 ? !prev.nitroActive : false,
     }));
   }, []);
-
-  // Référence pour le double-tap
-  const lastTapRef = useRef<{ time: number; side: 'left' | 'right' } | null>(null);
 
   // Démarrer avec pub
   const startGameWithAd = useCallback(() => {
@@ -435,6 +421,24 @@ export function MotoCourse() {
     return null;
   };
 
+  // Calculer la taille et position Y en fonction de z (perspective 3D)
+  const getObstacleStyle = (z: number, lane: number) => {
+    // z: 0 = horizon (loin), 100 = tout près
+    // Plus z est grand, plus l'objet est grand et bas dans l'écran
+    
+    const scale = 0.2 + (z / 100) * 1.2; // 0.2x à 1.4x
+    const y = 10 + (z / 100) * 55; // 10% à 65% du haut
+    const x = 50 + LANE_POSITIONS[lane] * (0.3 + (z / 100) * 0.7); // Ajustement perspective
+    
+    return {
+      left: `${x}%`,
+      top: `${y}%`,
+      transform: `translate(-50%, -50%) scale(${scale})`,
+      fontSize: `${1 + scale}rem`,
+      opacity: Math.min(1, z / 20), // Apparaît progressivement
+    };
+  };
+
   return (
     <div className="game-container w-full max-w-4xl mx-auto">
       <Card className="glass-card border-orange-500/30 overflow-hidden">
@@ -447,7 +451,7 @@ export function MotoCourse() {
                   <span className="text-xl">🏍️</span>
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-orange-400">Moto Course</h2>
+                  <h2 className="text-lg font-bold text-orange-400">Moto Course 3D</h2>
                   <p className="text-xs text-orange-200/60">Événement 2h • 1v1</p>
                 </div>
               </div>
@@ -486,22 +490,22 @@ export function MotoCourse() {
                 </div>
                 <h3 className="text-xl font-bold mb-2">Prêt pour la course ?</h3>
                 <p className="text-muted-foreground text-sm mb-4">
-                  Évitez les obstacles, collectez les pièces !
+                  Vue arrière réaliste - Évitez les obstacles !
                 </p>
                 
                 {/* Légende */}
                 <div className="flex justify-center gap-3 mb-4 flex-wrap">
                   <div className="flex items-center gap-1 px-2 py-1 rounded bg-red-500/20">
                     <span>🚗</span>
-                    <span className="text-xs text-red-400">-15</span>
+                    <span className="text-xs text-red-400">-8</span>
                   </div>
                   <div className="flex items-center gap-1 px-2 py-1 rounded bg-red-500/20">
                     <span>🚚</span>
-                    <span className="text-xs text-red-400">-25</span>
+                    <span className="text-xs text-red-400">-12</span>
                   </div>
                   <div className="flex items-center gap-1 px-2 py-1 rounded bg-yellow-500/20">
                     <span>🚧</span>
-                    <span className="text-xs text-yellow-400">-10</span>
+                    <span className="text-xs text-yellow-400">-5</span>
                   </div>
                   <div className="flex items-center gap-1 px-2 py-1 rounded bg-green-500/20">
                     <span>💰</span>
@@ -515,7 +519,7 @@ export function MotoCourse() {
 
                 <div className="bg-orange-500/10 rounded-lg p-3 mb-4 border border-orange-500/20">
                   <p className="text-xs text-orange-200">
-                    👆 1 tap = 1 voie • 2 taps rapides = aller au bout
+                    🎮 Vue arrière 3D immersive ! Touchez les boutons pour changer de voie.
                   </p>
                 </div>
 
@@ -543,8 +547,8 @@ export function MotoCourse() {
                       <div className="aspect-video bg-gradient-to-br from-orange-500/20 to-red-500/20 rounded-lg flex items-center justify-center mb-3">
                         <div className="text-center">
                           <div className="text-5xl mb-2">🏍️</div>
-                          <h4 className="text-lg font-bold text-white">LandPulse Racing</h4>
-                          <p className="text-gray-400 text-sm">Vitesse et adrénaline !</p>
+                          <h4 className="text-lg font-bold text-white">LandPulse Racing 3D</h4>
+                          <p className="text-gray-400 text-sm">Vue arrière réaliste !</p>
                         </div>
                       </div>
                       <Button
@@ -583,6 +587,7 @@ export function MotoCourse() {
                     </span>
                   </div>
                 )}
+                
                 {/* Timer et Scores */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 bg-red-500/20 px-3 py-1 rounded-full">
@@ -624,39 +629,85 @@ export function MotoCourse() {
                   </button>
                 </div>
 
-                {/* Zone de jeu - Route */}
-                <div
+                {/* Zone de jeu - Vue arrière 3D */}
+                <div 
                   className="moto-game-area relative rounded-xl overflow-hidden border-2 border-gray-600"
-                  style={{ height: '400px', touchAction: 'auto' }}
+                  style={{ height: '380px', touchAction: 'auto' }}
                 >
-                  {/* Fond route */}
-                  <div className="absolute inset-0 bg-gradient-to-b from-gray-700 via-gray-800 to-gray-900">
-                    {/* Lignes de route animées */}
-                    {[...Array(15)].map((_, i) => (
-                      <div
-                        key={i}
-                        className="absolute left-1/2 -translate-x-1/2 w-2 h-12 bg-yellow-400 rounded"
-                        style={{
-                          top: `${((i * 8) + gameState.roadOffset) % 120 - 10}%`,
-                          opacity: 0.8,
+                  {/* Ciel et horizon */}
+                  <div className="absolute inset-0 bg-gradient-to-b from-sky-900 via-sky-800 to-gray-700" />
+                  
+                  {/* Soleil couchant */}
+                  <div className="absolute top-8 left-1/2 -translate-x-1/2 w-20 h-10 bg-gradient-to-b from-orange-400 to-yellow-500 rounded-full blur-sm opacity-60" />
+                  
+                  {/* Montagnes lointaines */}
+                  <div className="absolute top-[20%] left-0 right-0 h-16">
+                    <svg viewBox="0 0 400 50" className="w-full h-full">
+                      <path d="M0,50 L50,20 L100,40 L150,10 L200,35 L250,15 L300,30 L350,5 L400,25 L400,50 Z" fill="rgba(30,30,40,0.8)" />
+                    </svg>
+                  </div>
+                  
+                  {/* Route avec perspective */}
+                  <div className="absolute bottom-0 left-0 right-0 h-[75%]">
+                    {/* Route elle-même - triangle qui s'élargit vers le bas */}
+                    <div 
+                      className="absolute inset-x-[10%] bottom-0 h-full"
+                      style={{
+                        background: 'linear-gradient(180deg, #374151 0%, #1f2937 100%)',
+                        clipPath: 'polygon(30% 0%, 70% 0%, 100% 100%, 0% 100%)',
+                      }}
+                    >
+                      {/* Lignes de route animées (vers le joueur) */}
+                      {[...Array(10)].map((_, i) => {
+                        const offset = ((i * 10 + gameState.roadOffset) % 100);
+                        const perspective = offset / 100; // 0 = loin, 1 = près
+                        const y = perspective * 100;
+                        const width = 20 + perspective * 60; // Plus large vers le bas
+                        
+                        return (
+                          <div
+                            key={i}
+                            className="absolute left-1/2 h-1 bg-yellow-400 rounded transition-none"
+                            style={{
+                              top: `${y}%`,
+                              width: `${width}%`,
+                              transform: 'translateX(-50%)',
+                              opacity: 0.6 + perspective * 0.4,
+                            }}
+                          />
+                        );
+                      })}
+                      
+                      {/* Lignes de séparation des voies */}
+                      <div className="absolute inset-0 flex justify-center" style={{ clipPath: 'polygon(30% 0%, 70% 0%, 100% 100%, 0% 100%)' }}>
+                        <div className="w-px h-full bg-white/10" />
+                      </div>
+                      
+                      {/* Bordures de route (blanc) */}
+                      <div 
+                        className="absolute top-0 bottom-0 w-2 bg-white"
+                        style={{ 
+                          left: '0%',
+                          clipPath: 'polygon(30% 0%, 70% 0%, 100% 100%, 0% 100%)',
                         }}
                       />
-                    ))}
+                      <div 
+                        className="absolute top-0 bottom-0 w-2 bg-white"
+                        style={{ 
+                          right: '0%',
+                          clipPath: 'polygon(30% 0%, 70% 0%, 100% 100%, 0% 100%)',
+                        }}
+                      />
+                    </div>
+                    
+                    {/* Herbe sur les côtés */}
+                    <div className="absolute bottom-0 left-0 w-[15%] h-full bg-gradient-to-t from-green-800 to-green-900" />
+                    <div className="absolute bottom-0 right-0 w-[15%] h-full bg-gradient-to-t from-green-800 to-green-900" />
                   </div>
 
-                  {/* Lignes de séparation des voies */}
-                  <div className="absolute inset-0 flex justify-around pointer-events-none">
-                    <div className="w-px h-full bg-white/20 border-dashed" />
-                    <div className="w-px h-full bg-white/20 border-dashed" />
-                  </div>
-
-                  {/* Bordures de route */}
-                  <div className="absolute left-0 top-0 bottom-0 w-4 bg-gradient-to-r from-green-800 to-green-700 border-r-4 border-white/50" />
-                  <div className="absolute right-0 top-0 bottom-0 w-4 bg-gradient-to-l from-green-800 to-green-700 border-l-4 border-white/50" />
-
-                  {/* Obstacles */}
+                  {/* Obstacles avec perspective 3D */}
                   {gameState.obstacles.map((obs) => {
-                    const laneX = LANE_POSITIONS[obs.lane];
+                    const style = getObstacleStyle(obs.z, obs.lane);
                     const isGood = obs.type === 'coin' || obs.type === 'nitro';
                     
                     return (
@@ -664,49 +715,80 @@ export function MotoCourse() {
                         key={obs.id}
                         className={`absolute transition-none pointer-events-none ${isGood ? 'animate-pulse' : ''}`}
                         style={{
-                          left: `${laneX}%`,
-                          top: `${obs.y}%`,
-                          transform: 'translate(-50%, -50%)',
-                          fontSize: '2.5rem',
+                          ...style,
                           filter: isGood 
                             ? 'drop-shadow(0 0 10px gold)' 
                             : 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))',
+                          zIndex: Math.floor(obs.z),
                         }}
                       >
-                        {OBSTACLE_TYPES.find(o => o.type === obs.type)?.emoji}
+                        <span style={{ fontSize: 'inherit' }}>
+                          {OBSTACLE_TYPES.find(o => o.type === obs.type)?.emoji}
+                        </span>
                       </div>
                     );
                   })}
 
-                  {/* Moto du joueur */}
+                  {/* Moto du joueur - Vue arrière */}
                   <div
-                    className={`absolute transition-all duration-150 pointer-events-none ${gameState.nitroActive ? 'scale-125' : ''}`}
+                    className="absolute transition-all duration-150 pointer-events-none"
                     style={{
-                      left: `${LANE_POSITIONS[gameState.playerLane]}%`,
-                      bottom: '8%',
+                      left: `${50 + LANE_POSITIONS[gameState.playerLane] * 0.7}%`,
+                      bottom: '5%',
                       transform: 'translateX(-50%)',
+                      zIndex: 100,
                     }}
                   >
                     {/* Effet nitro */}
                     {gameState.nitroActive && (
-                      <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 flex flex-col items-center">
-                        <div className="w-4 h-10 bg-gradient-to-t from-orange-500 via-yellow-400 to-transparent rounded-full animate-pulse" />
-                        <div className="w-3 h-5 bg-gradient-to-t from-red-500 to-transparent rounded-full" />
+                      <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 flex flex-col items-center">
+                        <div className="w-6 h-16 bg-gradient-to-t from-orange-500 via-yellow-400 to-transparent rounded-full animate-pulse opacity-80" />
+                        <div className="w-4 h-8 bg-gradient-to-t from-red-500 to-transparent rounded-full" />
                       </div>
                     )}
-                    <div className="text-5xl drop-shadow-lg" style={{ filter: gameState.nitroActive ? 'drop-shadow(0 0 25px orange)' : '' }}>
+                    
+                    {/* Moto emoji agrandi */}
+                    <div 
+                      className="text-6xl drop-shadow-lg"
+                      style={{ 
+                        filter: gameState.nitroActive ? 'drop-shadow(0 0 30px orange) drop-shadow(0 0 60px red)' : 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))',
+                        transform: gameState.nitroActive ? 'scale(1.1)' : 'scale(1)',
+                      }}
+                    >
                       🏍️
                     </div>
+                    
+                    {/* Effet de vitesse - lignes floues */}
+                    {gameState.speedLevel > 1 && (
+                      <>
+                        <div className="absolute -left-8 top-1/2 w-6 h-0.5 bg-white/20 blur-sm" />
+                        <div className="absolute -right-8 top-1/2 w-6 h-0.5 bg-white/20 blur-sm" />
+                      </>
+                    )}
                   </div>
 
                   {/* Hit feedback */}
                   {gameState.lastHit && (
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-3xl font-bold animate-bounce pointer-events-none">
+                    <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 text-3xl font-bold animate-bounce pointer-events-none z-50">
                       <span className={gameState.lastHit.points > 0 ? 'text-green-400' : 'text-red-400'}>
                         {gameState.lastHit.points > 0 ? '+' : ''}{gameState.lastHit.points}
                       </span>
                     </div>
                   )}
+                  
+                  {/* Indicateur de voie actuelle (petit) */}
+                  <div className="absolute top-2 right-2 flex gap-1 bg-black/30 px-2 py-1 rounded-full">
+                    {[0, 1, 2].map(lane => (
+                      <div 
+                        key={lane}
+                        className={`w-2 h-2 rounded-full transition-all ${
+                          gameState.playerLane === lane 
+                            ? 'bg-orange-400' 
+                            : 'bg-white/30'
+                        }`}
+                      />
+                    ))}
+                  </div>
                 </div>
 
                 {/* Boutons de contrôle */}
@@ -717,9 +799,6 @@ export function MotoCourse() {
                       e.preventDefault();
                       e.stopPropagation();
                       moveLane(-1);
-                    }}
-                    onMouseDown={(e) => {
-                      e.preventDefault();
                     }}
                     onClick={(e) => {
                       e.preventDefault();
@@ -753,9 +832,6 @@ export function MotoCourse() {
                       e.preventDefault();
                       e.stopPropagation();
                       moveLane(1);
-                    }}
-                    onMouseDown={(e) => {
-                      e.preventDefault();
                     }}
                     onClick={(e) => {
                       e.preventDefault();
