@@ -1,0 +1,439 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+/* LandPulse Dark Futuristic Theme */
+:root {
+  --radius: 0.75rem;
+  
+  /* Dark base colors */
+  --background: #07070a;
+  --foreground: #f0f0f5;
+  
+  /* Card with slight transparency for glassmorphism */
+  --card: rgba(15, 15, 25, 0.8);
+  --card-foreground: #f0f0f5;
+  
+  /* Popover */
+  --popover: rgba(15, 15, 25, 0.95);
+  --popover-foreground: #f0f0f5;
+  
+  /* Primary gradient colors */
+  --primary: #8b5cf6;
+  --primary-foreground: #ffffff;
+  
+  /* Secondary */
+  --secondary: rgba(139, 92, 246, 0.15);
+  --secondary-foreground: #c4b5fd;
+  
+  /* Muted */
+  --muted: rgba(30, 30, 50, 0.5);
+  --muted-foreground: #a0a0b0;
+  
+  /* Accent - cyan */
+  --accent: #06b6d4;
+  --accent-foreground: #ffffff;
+  
+  /* Destructive */
+  --destructive: #ef4444;
+  
+  /* Border and input */
+  --border: rgba(139, 92, 246, 0.2);
+  --input: rgba(139, 92, 246, 0.15);
+  --ring: rgba(139, 92, 246, 0.5);
+  
+  /* Chart colors */
+  --chart-1: #8b5cf6;
+  --chart-2: #06b6d4;
+  --chart-3: #ec4899;
+  --chart-4: #10b981;
+  --chart-5: #f59e0b;
+  
+  /* Sidebar */
+  --sidebar: rgba(10, 10, 20, 0.9);
+  --sidebar-foreground: #f0f0f5;
+  --sidebar-primary: #8b5cf6;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: rgba(139, 92, 246, 0.2);
+  --sidebar-accent-foreground: #c4b5fd;
+  --sidebar-border: rgba(139, 92, 246, 0.2);
+  --sidebar-ring: rgba(139, 92, 246, 0.5);
+  
+  /* LandPulse specific */
+  --gradient-primary: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #ec4899 100%);
+  --gradient-secondary: linear-gradient(135deg, #06b6d4 0%, #8b5cf6 100%);
+  --gradient-glow: linear-gradient(135deg, rgba(99, 102, 241, 0.3) 0%, rgba(236, 72, 153, 0.3) 100%);
+}
+
+.dark {
+  --background: #07070a;
+  --foreground: #f0f0f5;
+  --card: rgba(15, 15, 25, 0.8);
+  --card-foreground: #f0f0f5;
+  --popover: rgba(15, 15, 25, 0.95);
+  --popover-foreground: #f0f0f5;
+  --primary: #8b5cf6;
+  --primary-foreground: #ffffff;
+  --secondary: rgba(139, 92, 246, 0.15);
+  --secondary-foreground: #c4b5fd;
+  --muted: rgba(30, 30, 50, 0.5);
+  --muted-foreground: #a0a0b0;
+  --accent: #06b6d4;
+  --accent-foreground: #ffffff;
+  --destructive: #ef4444;
+  --border: rgba(139, 92, 246, 0.2);
+  --input: rgba(139, 92, 246, 0.15);
+  --ring: rgba(139, 92, 246, 0.5);
+  --chart-1: #8b5cf6;
+  --chart-2: #06b6d4;
+  --chart-3: #ec4899;
+  --chart-4: #10b981;
+  --chart-5: #f59e0b;
+  --sidebar: rgba(10, 10, 20, 0.9);
+  --sidebar-foreground: #f0f0f5;
+  --sidebar-primary: #8b5cf6;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: rgba(139, 92, 246, 0.2);
+  --sidebar-accent-foreground: #c4b5fd;
+  --sidebar-border: rgba(139, 92, 246, 0.2);
+  --sidebar-ring: rgba(139, 92, 246, 0.5);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    background-image: 
+      radial-gradient(ellipse at top, rgba(99, 102, 241, 0.1) 0%, transparent 50%),
+      radial-gradient(ellipse at bottom right, rgba(236, 72, 153, 0.08) 0%, transparent 50%),
+      radial-gradient(ellipse at bottom left, rgba(6, 182, 212, 0.08) 0%, transparent 50%);
+    background-attachment: fixed;
+  }
+}
+
+/* LandPulse Custom Styles */
+@layer components {
+  .gradient-text {
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  
+  .gradient-bg {
+    background: var(--gradient-primary);
+  }
+  
+  .gradient-border {
+    position: relative;
+    border-radius: var(--radius);
+  }
+  
+  .gradient-border::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    padding: 1px;
+    border-radius: inherit;
+    background: var(--gradient-primary);
+    -webkit-mask: 
+      linear-gradient(#fff 0 0) content-box, 
+      linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+  
+  .glass-card {
+    background: rgba(15, 15, 25, 0.6);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(139, 92, 246, 0.2);
+  }
+  
+  .glow-effect {
+    box-shadow: 
+      0 0 20px rgba(139, 92, 246, 0.3),
+      0 0 40px rgba(139, 92, 246, 0.1);
+  }
+  
+  .pulse-glow {
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+  
+  @keyframes pulse-glow {
+    0%, 100% {
+      box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
+    }
+    50% {
+      box-shadow: 0 0 30px rgba(139, 92, 246, 0.5), 0 0 50px rgba(236, 72, 153, 0.3);
+    }
+  }
+  
+  .parcel-available {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(16, 185, 129, 0.1) 100%);
+    border: 1px solid rgba(16, 185, 129, 0.4);
+  }
+  
+  .parcel-owned {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.4) 0%, rgba(236, 72, 153, 0.3) 100%);
+    border: 1px solid rgba(139, 92, 246, 0.6);
+  }
+  
+  .parcel-other {
+    background: rgba(30, 30, 40, 0.6);
+    border: 1px solid rgba(100, 100, 120, 0.3);
+  }
+  
+  .parcel-hover:hover {
+    transform: scale(1.1);
+    z-index: 10;
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.5);
+  }
+  
+  .map-grid {
+    display: grid;
+    gap: 2px;
+    background: rgba(139, 92, 246, 0.1);
+    padding: 2px;
+    border-radius: var(--radius);
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: rgba(30, 30, 50, 0.3);
+    border-radius: 3px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: rgba(139, 92, 246, 0.5);
+    border-radius: 3px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: rgba(139, 92, 246, 0.7);
+  }
+}
+
+/* Animations */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+/* Mapbox Custom Styles */
+.mapboxgl-map {
+  font-family: var(--font-sans), sans-serif !important;
+}
+
+.mapboxgl-ctrl-group {
+  background: rgba(15, 15, 25, 0.9) !important;
+  border: 1px solid rgba(139, 92, 246, 0.3) !important;
+  border-radius: 8px !important;
+}
+
+.mapboxgl-ctrl-group button {
+  background: transparent !important;
+  border: none !important;
+}
+
+.mapboxgl-ctrl-group button:hover {
+  background: rgba(139, 92, 246, 0.2) !important;
+}
+
+.mapboxgl-ctrl-group button + button {
+  border-top: 1px solid rgba(139, 92, 246, 0.2) !important;
+}
+
+.mapboxgl-ctrl-icon {
+  filter: invert(1) !important;
+}
+
+.mapboxgl-ctrl-attrib {
+  background: rgba(15, 15, 25, 0.8) !important;
+  color: rgba(160, 160, 176, 0.7) !important;
+  font-size: 10px !important;
+  padding: 2px 6px !important;
+}
+
+.mapboxgl-ctrl-attrib a {
+  color: rgba(139, 92, 246, 0.8) !important;
+}
+
+/* Map popup styling */
+.mapboxgl-popup-content {
+  background: rgba(15, 15, 25, 0.95) !important;
+  border: 1px solid rgba(139, 92, 246, 0.3) !important;
+  border-radius: 8px !important;
+  padding: 12px !important;
+  color: #f0f0f5 !important;
+}
+
+.mapboxgl-popup-tip {
+  border-top-color: rgba(139, 92, 246, 0.3) !important;
+}
+
+.mapboxgl-popup-close-button {
+  color: #f0f0f5 !important;
+  font-size: 18px !important;
+}
+
+.mapboxgl-popup-close-button:hover {
+  background: rgba(139, 92, 246, 0.2) !important;
+}
+
+/* Leaflet Custom Styles */
+.leaflet-container {
+  background: #0a0a15 !important;
+  font-family: var(--font-sans), sans-serif !important;
+}
+
+.leaflet-popup-content-wrapper {
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+.leaflet-popup-content {
+  margin: 0 !important;
+}
+
+.leaflet-popup-tip {
+  background: rgba(15, 15, 25, 0.95) !important;
+}
+
+.leaflet-popup-close-button {
+  display: none !important;
+}
+
+.custom-popup {
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
+.custom-parcel-marker {
+  background: transparent !important;
+  border: none !important;
+}
+
+.leaflet-control-zoom {
+  background: rgba(15, 15, 25, 0.9) !important;
+  border: 1px solid rgba(139, 92, 246, 0.3) !important;
+  border-radius: 8px !important;
+}
+
+.leaflet-control-zoom a {
+  background: transparent !important;
+  color: #f0f0f5 !important;
+  border: none !important;
+}
+
+.leaflet-control-zoom a:hover {
+  background: rgba(139, 92, 246, 0.2) !important;
+  color: #8b5cf6 !important;
+}
+
+.leaflet-control-attribution {
+  background: rgba(15, 15, 25, 0.8) !important;
+  color: rgba(160, 160, 176, 0.5) !important;
+  font-size: 10px !important;
+  padding: 2px 6px !important;
+}
+
+.leaflet-control-attribution a {
+  color: rgba(139, 92, 246, 0.7) !important;
+}
+
+.leaflet-tile-pane {
+  filter: brightness(0.85) saturate(0.9);
+}
+
+/* ============================================
+   MOBILE SCROLL FIX - Games and interactive areas
+   ============================================ */
+
+/* Allow scroll on the main container */
+html, body {
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+}
+
+/* Game areas should not block page scroll */
+.game-container,
+.mini-games-panel,
+.moto-game-area,
+.anneau-game-area,
+.peche-game-area,
+.memory-game-area {
+  touch-action: auto;
+}
+
+/* Fix for iOS rubber-band effect */
+@supports (-webkit-touch-callout: none) {
+  body {
+    overscroll-behavior-y: contain;
+  }
+}

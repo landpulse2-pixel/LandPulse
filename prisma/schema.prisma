@@ -1,0 +1,406 @@
+// LandPulse - Web3 Virtual Land Game on Solana
+// Prisma Schema - PostgreSQL (Supabase)
+// Devise: PulseBucks (PB) pour achats, Dollars ($) pour revenus, SOL pour retraits
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// User model
+model User {
+  id              String   @id @default(cuid())
+  walletAddress   String   @unique
+
+  // Profile public
+  username        String?  @unique // Pseudo affiché publiquement
+  avatarUrl       String?  // URL de l'avatar
+
+  // PulseBucks - Purchase currency (bought with USDC)
+  pulseBucks      Float    @default(100)
+
+  // Dollars - Revenue currency (earned from parcels, displayed in $)
+  dollars         Float    @default(0)
+  totalDollarsEarned Float  @default(0)
+
+  // Last time dollars were calculated (for offline earnings)
+  lastDollarsUpdate DateTime @default(now())
+
+  // Stats
+  lastDailyBonus  DateTime?
+  totalEarned     Float    @default(0)
+  totalSpent      Float    @default(0)
+
+  // Withdrawal stats
+  totalWithdrawn  Float    @default(0) // Total dollars withdrawn
+  withdrawnToday  Float    @default(0) // Dollars withdrawn today
+  withdrawnThisWeek Float  @default(0) // Dollars withdrawn this week
+  lastWithdrawalDate DateTime? // Track daily/weekly reset
+
+  // Subscription - "free", "premium", "vip"
+  subscription    String   @default("free")
+  subscriptionEnd DateTime?
+
+  // Boost from ads
+  boostEndTime    DateTime?
+  totalAdsWatched Int      @default(0)
+  adsWatchedToday Int      @default(0)
+  lastAdWatchDate DateTime?
+
+  // Referral system
+  referralCode    String?  @unique
+  referredBy      String?
+  referralCount   Int      @default(0)
+  referralEarnings Float   @default(0)
+  commissionEarnings Float @default(0)
+
+  // Campaign "Top 100"
+  campaignCompleted    Boolean @default(false)
+  campaignRewardClaimed Boolean @default(false)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  parcels         Parcel[]
+  buildings       Building[]
+  transactions    Transaction[]
+  withdrawals     Withdrawal[]
+  subscriptions   Subscription[]
+  referralsAsReferrer Referral[] @relation("Referrer")
+  referralsAsReferred Referral[] @relation("Referred")
+
+  @@map("User")
+}
+
+// Parcel (Passerelle) model - 4 levels with random rarity
+model Parcel {
+  id              String   @id @default(cuid())
+
+  // Location (real world coordinates for globe/map)
+  lat             Float
+  lng             Float
+
+  // Rarity level (randomly determined on purchase)
+  level           String   // "common", "rare", "epic", "legendary"
+
+  // Dollars per second (based on level) - RENT IS IN DOLLARS
+  dollarsPerSecond Float   @default(0)
+
+  // Owner
+  ownerId         String?
+  owner           User?    @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+
+  // Building occupying this parcel
+  occupiedByBuildingId String?
+
+  // Boost (assigned by building)
+  boostedBy       String?
+
+  // Improvement level
+  improvementLevel Int     @default(0)
+
+  // Timestamps
+  purchasedAt     DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([lat, lng])
+
+  @@map("Parcel")
+}
+
+// Building model - Boosts parcel income
+model Building {
+  id              String   @id @default(cuid())
+
+  // Building type
+  type            String   // "house"
+
+  // Building name
+  name            String   @default("Maison")
+
+  // Capacity (for future use)
+  capacity        Int      @default(1)
+
+  // Boost percentage
+  boostPercent    Int      @default(10)
+
+  // Price in PB
+  price           Int      @default(200)
+
+  // Owner
+  ownerId         String
+  owner           User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  // Assigned parcels (JSON array)
+  assignedParcels String?
+
+  // Timestamps
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("Building")
+}
+
+// Transaction model - Track all purchases
+model Transaction {
+  id              String   @id @default(cuid())
+
+  // User
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Transaction details
+  type            String   // "purchase_parcel", "purchase_building", "daily_bonus", "buy_pb_usdc", "withdrawal_sol"
+  amount          Float    // PB or $ amount
+  paymentMethod   String?  // "usdc", "sol", null
+  paymentAmount   Float?   // Amount paid in crypto
+  txHash          String?  // Blockchain transaction hash
+
+  // Status
+  status          String   @default("completed") // "pending", "completed", "failed"
+
+  // Metadata
+  metadata        String?  // JSON for additional data
+
+  createdAt       DateTime @default(now())
+
+  @@map("Transaction")
+}
+
+// Withdrawal model - Track SOL withdrawals
+model Withdrawal {
+  id              String   @id @default(cuid())
+
+  // User
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Withdrawal details
+  dollarAmount    Float    // Amount in $ to withdraw
+  solAmount       Float    // Amount in SOL sent
+  solPrice        Float    // SOL price at time of withdrawal
+
+  // Fees
+  feeDollars      Float    // Fee in $ (2%)
+  feeSOL          Float    // Fee in SOL
+
+  // Transaction
+  txHash          String?  // Solana transaction hash
+  status          String   @default("pending") // "pending", "processing", "completed", "failed"
+
+  // Timestamps
+  createdAt       DateTime @default(now())
+  processedAt     DateTime?
+
+  @@map("Withdrawal")
+}
+
+// Ad Watch model - Track ad views for boosts
+model AdWatch {
+  id              String   @id @default(cuid())
+
+  // User
+  userId          String
+
+  // Ad details
+  adType          String   // "boost_1h"
+  duration        Int
+
+  // Reward
+  boostDuration   Int
+
+  // Timestamp
+  watchedAt       DateTime @default(now())
+
+  @@map("AdWatch")
+}
+
+// TokenPrice model - Store SOL price for withdrawals
+model TokenPrice {
+  id              String   @id @default(cuid())
+  token           String   @unique // "SOL"
+  priceUsd        Float    // Current price in USD
+  change24h       Float    @default(0)
+  lastUpdated     DateTime @default(now())
+
+  @@map("TokenPrice")
+}
+
+// AppSettings model - Global app configuration
+model AppSettings {
+  id              String   @id @default(cuid())
+  key             String   @unique
+  value           String   // JSON value
+  updatedAt       DateTime @updatedAt
+
+  @@map("AppSettings")
+}
+
+// Subscription model - Track subscription purchases
+model Subscription {
+  id              String   @id @default(cuid())
+
+  // User
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Subscription details
+  tier            String   // "premium", "vip"
+  priceUsd        Float
+
+  // Payment
+  paymentMethod   String   // "sol", "usdc"
+  paymentAmount   Float
+  txHash          String?
+
+  // Duration
+  durationDays    Int
+  startDate       DateTime @default(now())
+  endDate         DateTime
+
+  // Status
+  status          String   @default("active")
+
+  createdAt       DateTime @default(now())
+
+  @@map("Subscription")
+}
+
+// Referral model - Track referrals between users
+model Referral {
+  id              String   @id @default(cuid())
+
+  // Referrer
+  referrerId      String
+  referrer        User     @relation("Referrer", fields: [referrerId], references: [id], onDelete: Cascade)
+
+  // Referred
+  referredId      String
+  referred        User     @relation("Referred", fields: [referredId], references: [id], onDelete: Cascade)
+
+  // Code used
+  codeUsed        String
+
+  // Rewards
+  referrerReward  Int      @default(500)
+  referredReward  Int      @default(500)
+
+  // Commission tracking
+  totalCommissionEarned Float @default(0)
+
+  // Campaign bonus
+  campaignEligible Boolean @default(true)
+
+  // Timestamp
+  createdAt       DateTime @default(now())
+
+  @@unique([referredId])
+  @@map("Referral")
+}
+
+// Campaign Stats model - Track Top 100 campaign progress
+model CampaignStats {
+  id              String   @id @default(cuid())
+  completedCount  Int      @default(0)
+  updatedAt       DateTime @updatedAt
+
+  @@map("CampaignStats")
+}
+
+// Monument model - Famous landmarks sold via auction
+model Monument {
+  id              String   @id @default(cuid())
+  monumentId      String   @unique
+  lat             Float
+  lng             Float
+  name            String
+  city            String
+  country         String
+  emoji           String
+  rarity          String   // "mythic" or "legendary"
+  incomeMultiplier Int     @default(10) // x10 for mythic, x5 for legendary
+  status          String   @default("locked")
+  basePricePB     Int
+  currentBidPB    Int      @default(0)
+  currentBidderId String?
+  winnerId        String?
+  soldPricePB     Int      @default(0)
+  auctionStart    DateTime?
+  auctionEnd      DateTime?
+  soldAt          DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("Monument")
+}
+
+// MonumentBid model - Track all bids on monument auctions
+model MonumentBid {
+  id              String   @id @default(cuid())
+  monumentId      String
+  userId          String
+  amountPB        Int
+  isWinning       Boolean  @default(false)
+  createdAt       DateTime @default(now())
+
+  @@map("MonumentBid")
+}
+
+// GameEvent model - Anneau Royal and other mini-games
+model GameEvent {
+  id              String   @id @default(cuid())
+  type            String   // "anneau_royal", "quiz", etc.
+  name            String
+  description     String?
+  startTime       DateTime
+  endTime         DateTime
+  status          String   @default("scheduled") // "scheduled", "active", "ended"
+  rewardPoolPB    Int      @default(0)
+  participants    Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("GameEvent")
+}
+
+// GameSession model - Individual game sessions
+model GameSession {
+  id              String   @id @default(cuid())
+  eventId         String?
+  player1Id       String
+  player2Id       String?
+  player1Score    Int      @default(0)
+  player2Score    Int      @default(0)
+  winnerId        String?
+  gameType        String   @default("anneau_royal")
+  duration        Int      @default(60) // seconds
+  status          String   @default("completed") // "pending", "playing", "completed"
+  createdAt       DateTime @default(now())
+
+  @@map("GameSession")
+}
+
+// PlayerEventStats model - Player stats per event
+model PlayerEventStats {
+  id              String   @id @default(cuid())
+  userId          String
+  eventId         String
+  victories       Int      @default(0)
+  defeats         Int      @default(0)
+  draws           Int      @default(0)
+  totalScore      Int      @default(0)
+  totalGames      Int      @default(0)
+  rewardsClaimed  Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([userId, eventId])
+  @@map("PlayerEventStats")
+}
