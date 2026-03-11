@@ -12,8 +12,8 @@ interface GameState {
   playerScore: number;
   opponentScore: number;
   timeLeft: number;
-  rpm: number; // 0-10000
-  currentGear: number; // 1 à 6
+  rpm: number;
+  currentGear: number;
   rpmDirection: 'up' | 'down';
   rpmSpeed: number;
   lastShift: { gear: number; points: number; zone: 'perfect' | 'good' | 'bad' | null } | null;
@@ -25,7 +25,6 @@ interface GameState {
   roadOffset: number;
   combo: number;
   maxCombo: number;
-  motoX: number; // Position horizontale de la moto pour effet de virage
 }
 
 // Configuration des vitesses
@@ -66,7 +65,6 @@ export function MotoCourse() {
     roadOffset: 0,
     combo: 0,
     maxCombo: 0,
-    motoX: 50,
   });
 
   const gameLoopRef = useRef<NodeJS.Timeout | null>(null);
@@ -113,7 +111,6 @@ export function MotoCourse() {
         roadOffset: 0,
         combo: 0,
         maxCombo: 0,
-        motoX: 50,
       }));
     }, 2000 + Math.random() * 1000);
 
@@ -166,7 +163,7 @@ export function MotoCourse() {
         let warning = false;
         
         if (prev.rpmDirection === 'up') {
-          newRpm += baseSpeed / 8;
+          newRpm += baseSpeed / 6;
           
           if (newRpm >= gear.maxRpm) {
             newRpm = gear.maxRpm;
@@ -181,26 +178,22 @@ export function MotoCourse() {
             };
           }
           
-          if (newRpm >= gear.optimalMin - 300) {
+          if (newRpm >= gear.optimalMin - 500) {
             warning = true;
           }
         } else {
-          newRpm -= baseSpeed / 4;
+          newRpm -= baseSpeed / 3;
           if (newRpm <= 2000) {
             newRpm = 2000;
             newDirection = 'up';
           }
         }
         
-        // Effet de virage subtil
-        const newMotoX = 50 + Math.sin(Date.now() / 1000) * 3;
-        
         return {
           ...prev,
           rpm: newRpm,
           rpmDirection: newDirection,
           showShiftWarning: warning,
-          motoX: newMotoX,
         };
       });
     }, 25);
@@ -216,13 +209,13 @@ export function MotoCourse() {
 
     roadLoopRef.current = setInterval(() => {
       setGameState(prev => {
-        const speed = (prev.rpm / 10000) * 20 * prev.currentGear;
+        const speed = (prev.rpm / 10000) * 25 * prev.currentGear;
         return {
           ...prev,
           roadOffset: (prev.roadOffset + speed) % 100,
         };
       });
-    }, 30);
+    }, 25);
 
     return () => {
       if (roadLoopRef.current) clearInterval(roadLoopRef.current);
@@ -290,10 +283,10 @@ export function MotoCourse() {
       let points = 0;
       let zone: 'perfect' | 'good' | 'bad' = 'bad';
       
-      if (distanceFromOptimal <= 250) {
+      if (distanceFromOptimal <= 300) {
         points = 100 + prev.combo * 10;
         zone = 'perfect';
-      } else if (distanceFromOptimal <= 800) {
+      } else if (distanceFromOptimal <= 1000) {
         points = 50;
         zone = 'good';
       } else {
@@ -350,26 +343,11 @@ export function MotoCourse() {
     return null;
   };
 
-  // Calculer la rotation de l'aiguille (-135° à +135°)
+  // Calculer la rotation de l'aiguille (0° = min, 180° = max)
   const getNeedleRotation = () => {
-    const minAngle = -135;
-    const maxAngle = 135;
-    const totalDegrees = maxAngle - minAngle;
-    const percentage = (gameState.rpm - 1000) / 9000; // 1000 à 10000 RPM
-    return minAngle + (percentage * totalDegrees);
-  };
-
-  // Position de la zone optimale sur le cadran
-  const getOptimalZoneStyle = () => {
-    const gear = GEARS[gameState.currentGear - 1];
-    const startAngle = -135 + ((gear.optimalMin - 1000) / 9000) * 270;
-    const endAngle = -135 + ((gear.optimalMax - 1000) / 9000) * 270;
-    const arcAngle = endAngle - startAngle;
-    
-    return {
-      startAngle,
-      arcAngle,
-    };
+    // RPM de 1000 à 10000
+    const percentage = (gameState.rpm - 1000) / 9000;
+    return percentage * 180; // 0° à 180°
   };
 
   return (
@@ -424,7 +402,6 @@ export function MotoCourse() {
                   Passez les vitesses au bon moment pour gagner !
                 </p>
                 
-                {/* Explication */}
                 <div className="bg-gray-900/50 rounded-lg p-4 mb-4 text-left max-w-md mx-auto">
                   <h4 className="font-semibold text-orange-400 mb-2">🎮 Comment jouer :</h4>
                   <ul className="text-sm text-muted-foreground space-y-2">
@@ -432,7 +409,6 @@ export function MotoCourse() {
                     <li>• Appuyez sur <strong className="text-orange-400">PASSER</strong> dans la <strong className="text-green-400">zone verte</strong></li>
                     <li>• <strong className="text-green-400">Parfait</strong> = +100 pts | <strong className="text-yellow-400">Bien</strong> = +50 pts</li>
                     <li>• <strong className="text-red-400">Raté</strong> = -20 pts</li>
-                    <li>• Enchaînez les passages parfaits pour un <strong className="text-yellow-400">bonus combo</strong> !</li>
                   </ul>
                 </div>
 
@@ -461,7 +437,6 @@ export function MotoCourse() {
                         <div className="text-center">
                           <div className="text-5xl mb-2">🏍️💨</div>
                           <h4 className="text-lg font-bold text-white">LandPulse Drag Race</h4>
-                          <p className="text-gray-400 text-sm">Maîtrisez les vitesses !</p>
                         </div>
                       </div>
                       <Button
@@ -519,59 +494,87 @@ export function MotoCourse() {
                   </div>
                 </div>
 
-                {/* Zone de jeu - Moto vue de côté avec route */}
+                {/* Zone de jeu - Vue arrière immerssive */}
                 <div 
                   className="moto-game-area relative rounded-xl overflow-hidden border-2 border-gray-600"
-                  style={{ height: '200px', touchAction: 'auto' }}
+                  style={{ height: '280px', touchAction: 'auto' }}
                 >
-                  {/* Fond route */}
-                  <div className="absolute inset-0 bg-gradient-to-b from-gray-700 via-gray-800 to-gray-900">
-                    {/* Lignes de route animées */}
-                    {[...Array(12)].map((_, i) => (
-                      <div
-                        key={i}
-                        className="absolute left-1/2 -translate-x-1/2 w-2 h-10 bg-yellow-400 rounded"
-                        style={{
-                          top: `${((i * 9) + gameState.roadOffset) % 120 - 10}%`,
-                          opacity: 0.6,
-                        }}
-                      />
-                    ))}
-                  </div>
+                  {/* Ciel */}
+                  <div className="absolute inset-0 bg-gradient-to-b from-sky-900 via-sky-800 to-gray-700" />
                   
-                  {/* Lignes de voie */}
-                  <div className="absolute inset-0 flex justify-around pointer-events-none">
-                    <div className="w-px h-full bg-white/10" />
-                    <div className="w-px h-full bg-white/10" />
+                  {/* Soleil */}
+                  <div className="absolute top-4 left-1/2 -translate-x-1/2 w-12 h-6 bg-gradient-to-b from-orange-400 to-yellow-500 rounded-full blur-sm opacity-70" />
+                  
+                  {/* Route avec perspective */}
+                  <div className="absolute bottom-0 left-0 right-0 h-[75%]">
+                    <div 
+                      className="absolute inset-x-[10%] bottom-0 h-full"
+                      style={{
+                        background: 'linear-gradient(180deg, #374151 0%, #1f2937 100%)',
+                        clipPath: 'polygon(30% 0%, 70% 0%, 100% 100%, 0% 100%)',
+                      }}
+                    >
+                      {/* Lignes de route */}
+                      {[...Array(10)].map((_, i) => {
+                        const offset = ((i * 10 + gameState.roadOffset) % 100);
+                        const perspective = offset / 100;
+                        const y = perspective * 100;
+                        const width = 15 + perspective * 50;
+                        
+                        return (
+                          <div
+                            key={i}
+                            className="absolute left-1/2 h-1 bg-yellow-400 rounded"
+                            style={{
+                              top: `${y}%`,
+                              width: `${width}%`,
+                              transform: 'translateX(-50%)',
+                              opacity: 0.5 + perspective * 0.5,
+                            }}
+                          />
+                        );
+                      })}
+                    </div>
+                    
+                    {/* Herbe */}
+                    <div className="absolute bottom-0 left-0 w-[15%] h-full bg-gradient-to-t from-green-800 to-green-900" />
+                    <div className="absolute bottom-0 right-0 w-[15%] h-full bg-gradient-to-t from-green-800 to-green-900" />
                   </div>
 
-                  {/* Moto vue de côté */}
-                  <div
-                    className="absolute transition-all duration-100"
-                    style={{
-                      left: `${gameState.motoX}%`,
-                      bottom: '15%',
-                      transform: 'translateX(-50%)',
-                      fontSize: '4rem',
-                      filter: gameState.rpm > 8000 ? 'drop-shadow(0 0 20px orange)' : 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))',
-                    }}
-                  >
-                    🏍️
-                    {/* Effet de vitesse */}
+                  {/* Moto vue de derrière (comme si on était dessus) */}
+                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20">
+                    <div 
+                      className="text-7xl"
+                      style={{ 
+                        filter: gameState.rpm > 8000 
+                          ? 'drop-shadow(0 0 30px orange) drop-shadow(0 0 60px red)' 
+                          : 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))',
+                        transform: gameState.rpm > 8000 ? 'scale(1.05)' : 'scale(1)',
+                      }}
+                    >
+                      🏍️
+                    </div>
+                    {/* Effet vitesse */}
                     {gameState.rpm > 6000 && (
-                      <div className="absolute -left-4 top-1/2 w-3 h-0.5 bg-white/40 blur-sm" />
+                      <>
+                        <div className="absolute -left-6 top-1/2 w-4 h-0.5 bg-white/40 blur-sm" />
+                        <div className="absolute -right-6 top-1/2 w-4 h-0.5 bg-white/40 blur-sm" />
+                      </>
                     )}
                   </div>
-                  
-                  {/* Feedback de passage */}
+
+                  {/* Feedback */}
                   {gameState.lastShift && (
                     <div className="absolute top-1/4 left-1/2 -translate-x-1/2 text-center z-30 animate-bounce">
-                      <div className={`text-xl font-black ${gameState.lastShift.zone === 'perfect' ? 'text-green-400' : gameState.lastShift.zone === 'good' ? 'text-yellow-400' : 'text-red-400'}`}>
+                      <div className={`text-2xl font-black ${
+                        gameState.lastShift.zone === 'perfect' ? 'text-green-400' : 
+                        gameState.lastShift.zone === 'good' ? 'text-yellow-400' : 'text-red-400'
+                      }`}>
                         {gameState.lastShift.zone === 'perfect' && '🔥 PARFAIT!'}
                         {gameState.lastShift.zone === 'good' && '👍 BIEN!'}
                         {gameState.lastShift.zone === 'bad' && '😵 RATÉ'}
                       </div>
-                      <div className={`text-sm font-bold ${gameState.lastShift.points > 0 ? 'text-green-300' : 'text-red-300'}`}>
+                      <div className={`text-lg font-bold ${gameState.lastShift.points > 0 ? 'text-green-300' : 'text-red-300'}`}>
                         {gameState.lastShift.points > 0 ? '+' : ''}{gameState.lastShift.points}
                       </div>
                     </div>
@@ -579,9 +582,9 @@ export function MotoCourse() {
                   
                   {/* Warning */}
                   {gameState.showShiftWarning && (
-                    <div className="absolute top-2 left-1/2 -translate-x-1/2 z-30">
-                      <div className="bg-green-500/30 border border-green-500/50 px-2 py-0.5 rounded-full animate-pulse">
-                        <span className="text-green-400 font-bold text-xs">PASSER!</span>
+                    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30">
+                      <div className="bg-green-500/40 border-2 border-green-400 px-3 py-1 rounded-full animate-pulse">
+                        <span className="text-green-300 font-bold text-sm">🎯 PASSER!</span>
                       </div>
                     </div>
                   )}
@@ -589,67 +592,85 @@ export function MotoCourse() {
 
                 {/* Compte-tour circulaire avec aiguille */}
                 <div className="flex gap-3 items-center">
-                  {/* Indicateur vitesse */}
-                  <div className="w-16 h-16 rounded-full bg-gray-900 border-2 border-orange-500/50 flex flex-col items-center justify-center">
-                    <span className="text-xs text-muted-foreground">Vit.</span>
-                    <span className="text-2xl font-black text-orange-400">{gameState.currentGear}</span>
+                  {/* Vitesse actuelle */}
+                  <div className="w-20 h-20 rounded-full bg-gray-900 border-2 border-orange-500 flex flex-col items-center justify-center flex-shrink-0">
+                    <span className="text-[10px] text-muted-foreground">VITESSE</span>
+                    <span className="text-3xl font-black text-orange-400">{gameState.currentGear}</span>
+                    <span className="text-[10px] text-orange-300">/ 6</span>
                   </div>
                   
-                  {/* Compte-tour circulaire */}
-                  <div className="flex-1 bg-gray-900 rounded-xl p-4 border border-gray-700">
-                    <div className="relative w-full aspect-[2/1] flex items-end justify-center">
-                      {/* Cadran du compte-tour (demi-cercle) */}
-                      <svg viewBox="0 0 200 110" className="w-full h-full">
-                        {/* Fond du cadran */}
+                  {/* Compte-tour SVG */}
+                  <div className="flex-1 bg-gray-900 rounded-xl p-3 border border-gray-700">
+                    <div className="relative flex justify-center" style={{ height: '100px' }}>
+                      <svg viewBox="0 0 200 110" className="w-full h-full" style={{ maxWidth: '300px' }}>
+                        {/* Fond du cadran - demi-cercle */}
                         <path
-                          d="M 20 100 A 80 80 0 0 1 180 100"
+                          d="M 10 100 A 90 90 0 0 1 190 100"
                           fill="none"
-                          stroke="#374151"
-                          strokeWidth="20"
+                          stroke="#1f2937"
+                          strokeWidth="25"
                           strokeLinecap="round"
                         />
                         
-                        {/* Zone rouge (sur-régime) */}
+                        {/* Zone bas régime (gris) */}
                         <path
-                          d="M 160 35 A 80 80 0 0 1 180 100"
+                          d="M 10 100 A 90 90 0 0 1 55 28"
                           fill="none"
-                          stroke="#dc2626"
-                          strokeWidth="20"
+                          stroke="#4b5563"
+                          strokeWidth="25"
                           strokeLinecap="round"
-                          opacity="0.8"
                         />
                         
-                        {/* Zone optimale (verte) - dynamique selon la vitesse */}
+                        {/* Zone moyenne (jaune) */}
+                        <path
+                          d="M 55 28 A 90 90 0 0 1 145 28"
+                          fill="none"
+                          stroke="#eab308"
+                          strokeWidth="25"
+                          strokeLinecap="round"
+                        />
+                        
+                        {/* Zone optimale (verte) - dynamique */}
                         {(() => {
                           const gear = GEARS[gameState.currentGear - 1];
-                          const startAngle = Math.PI - ((gear.optimalMin - 1000) / 9000) * Math.PI;
-                          const endAngle = Math.PI - ((gear.optimalMax - 1000) / 9000) * Math.PI;
+                          const startPct = (gear.optimalMin - 1000) / 9000;
+                          const endPct = (gear.optimalMax - 1000) / 9000;
                           
-                          const startX = 100 + 80 * Math.cos(startAngle);
-                          const startY = 100 - 80 * Math.sin(startAngle);
-                          const endX = 100 + 80 * Math.cos(endAngle);
-                          const endY = 100 - 80 * Math.sin(endAngle);
+                          const startAngle = Math.PI - startPct * Math.PI;
+                          const endAngle = Math.PI - endPct * Math.PI;
                           
-                          const largeArc = 0;
+                          const x1 = 100 + 90 * Math.cos(startAngle);
+                          const y1 = 100 - 90 * Math.sin(startAngle);
+                          const x2 = 100 + 90 * Math.cos(endAngle);
+                          const y2 = 100 - 90 * Math.sin(endAngle);
                           
                           return (
                             <path
-                              d={`M ${startX} ${startY} A 80 80 0 ${largeArc} 1 ${endX} ${endY}`}
+                              d={`M ${x1} ${y1} A 90 90 0 0 1 ${x2} ${y2}`}
                               fill="none"
                               stroke="#22c55e"
-                              strokeWidth="22"
+                              strokeWidth="28"
                               strokeLinecap="round"
-                              opacity="0.9"
-                              className="animate-pulse"
+                              className={gameState.rpm >= gear.optimalMin && gameState.rpm <= gear.optimalMax ? "animate-pulse" : ""}
+                              style={{ filter: 'drop-shadow(0 0 8px #22c55e)' }}
                             />
                           );
                         })()}
                         
+                        {/* Zone rouge (sur-régime) */}
+                        <path
+                          d="M 145 28 A 90 90 0 0 1 190 100"
+                          fill="none"
+                          stroke="#dc2626"
+                          strokeWidth="25"
+                          strokeLinecap="round"
+                        />
+                        
                         {/* Graduations */}
-                        {[0, 2, 4, 6, 8, 10].map((num, i) => {
-                          const angle = Math.PI - (i / 5) * Math.PI;
-                          const x = 100 + 65 * Math.cos(angle);
-                          const y = 100 - 65 * Math.sin(angle);
+                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num, i) => {
+                          const angle = Math.PI - (i / 9) * Math.PI;
+                          const x = 100 + 70 * Math.cos(angle);
+                          const y = 100 - 70 * Math.sin(angle);
                           return (
                             <text
                               key={num}
@@ -657,7 +678,11 @@ export function MotoCourse() {
                               y={y}
                               textAnchor="middle"
                               dominantBaseline="middle"
-                              className="fill-gray-400 text-xs font-bold"
+                              style={{ 
+                                fontSize: '10px', 
+                                fontWeight: 'bold', 
+                                fill: num >= 8 ? '#ef4444' : num >= 6 ? '#eab308' : '#9ca3af' 
+                              }}
                             >
                               {num}
                             </text>
@@ -666,45 +691,69 @@ export function MotoCourse() {
                         
                         {/* Aiguille */}
                         <g transform={`rotate(${getNeedleRotation()}, 100, 100)`}>
+                          {/* Ombre de l'aiguille */}
                           <line
                             x1="100"
                             y1="100"
                             x2="100"
-                            y2="35"
-                            stroke="#ffffff"
-                            strokeWidth="3"
+                            y2="25"
+                            stroke="rgba(0,0,0,0.5)"
+                            strokeWidth="5"
                             strokeLinecap="round"
-                            className="drop-shadow-lg"
+                            transform="translate(2, 2)"
                           />
-                          <circle cx="100" cy="100" r="8" fill="#f97316" stroke="#fff" strokeWidth="2" />
+                          {/* Aiguille principale */}
+                          <line
+                            x1="100"
+                            y1="100"
+                            x2="100"
+                            y2="20"
+                            stroke="#ffffff"
+                            strokeWidth="4"
+                            strokeLinecap="round"
+                          />
+                          {/* Pointe rouge */}
+                          <polygon
+                            points="100,15 95,25 105,25"
+                            fill="#ef4444"
+                          />
                         </g>
                         
-                        {/* Texte RPM */}
+                        {/* Centre de l'aiguille */}
+                        <circle cx="100" cy="100" r="12" fill="#1f2937" stroke="#f97316" strokeWidth="3" />
+                        <circle cx="100" cy="100" r="5" fill="#f97316" />
+                        
+                        {/* Affichage RPM numérique */}
                         <text
                           x="100"
-                          y="95"
+                          y="85"
                           textAnchor="middle"
-                          className={`text-sm font-bold ${gameState.rpm >= GEARS[gameState.currentGear - 1].optimalMin && gameState.rpm <= GEARS[gameState.currentGear - 1].optimalMax ? 'fill-green-400' : gameState.rpm >= 8000 ? 'fill-red-400' : 'fill-white'}`}
+                          style={{ 
+                            fontSize: '16px', 
+                            fontWeight: 'bold',
+                            fill: gameState.rpm >= 8000 ? '#ef4444' : 
+                                   gameState.rpm >= GEARS[gameState.currentGear - 1].optimalMin ? '#22c55e' : '#ffffff'
+                          }}
                         >
-                          {Math.round(gameState.rpm / 1000)}K
+                          {Math.round(gameState.rpm)}
                         </text>
                         <text
                           x="100"
-                          y="108"
+                          y="98"
                           textAnchor="middle"
-                          className="fill-gray-500 text-[8px]"
+                          style={{ fontSize: '8px', fill: '#6b7280' }}
                         >
-                          RPM x1000
+                          RPM
                         </text>
                       </svg>
                     </div>
                   </div>
                   
-                  {/* Indicateur combo */}
+                  {/* Combo */}
                   {gameState.combo >= 2 && (
-                    <div className="w-16 h-16 rounded-full bg-yellow-500/20 border-2 border-yellow-500/50 flex flex-col items-center justify-center animate-pulse">
-                      <span className="text-xs text-yellow-400">COMBO</span>
-                      <span className="text-xl font-black text-yellow-400">x{gameState.combo}</span>
+                    <div className="w-20 h-20 rounded-full bg-yellow-500/20 border-2 border-yellow-500 flex flex-col items-center justify-center flex-shrink-0 animate-pulse">
+                      <span className="text-[10px] text-yellow-400">COMBO</span>
+                      <span className="text-2xl font-black text-yellow-400">x{gameState.combo}</span>
                     </div>
                   )}
                 </div>
@@ -720,11 +769,11 @@ export function MotoCourse() {
                     e.preventDefault();
                     e.stopPropagation();
                   }}
-                  className={`w-full py-5 rounded-xl border-2 transition-all flex items-center justify-center gap-3 select-none shadow-lg ${
+                  className={`w-full py-5 rounded-xl border-2 transition-all flex items-center justify-center gap-3 select-none ${
                     gameState.showShiftWarning 
-                      ? 'bg-gradient-to-b from-green-500 to-green-600 border-green-400 shadow-green-500/30 animate-pulse' 
-                      : 'bg-gradient-to-b from-orange-500 to-red-600 border-orange-400 shadow-orange-500/30'
-                  } active:scale-95`}
+                      ? 'bg-gradient-to-b from-green-500 to-green-600 border-green-400 animate-pulse' 
+                      : 'bg-gradient-to-b from-orange-500 to-red-600 border-orange-400'
+                  } active:scale-95 shadow-lg ${gameState.showShiftWarning ? 'shadow-green-500/40' : 'shadow-orange-500/30'}`}
                 >
                   <Zap className="h-6 w-6 text-white" />
                   <span className="text-xl font-black text-white">
@@ -733,7 +782,6 @@ export function MotoCourse() {
                   <Zap className="h-6 w-6 text-white" />
                 </button>
                 
-                {/* Instructions */}
                 <p className="text-center text-xs text-muted-foreground">
                   Appuyez quand l&apos;aiguille est dans la <span className="text-green-400 font-bold">zone verte</span> !
                 </p>
