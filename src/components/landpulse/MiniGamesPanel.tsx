@@ -11,6 +11,7 @@ import { AnneauRoyal } from './AnneauRoyal';
 import { PecheParcelles } from './PecheParcelles';
 import { MotoCourse } from './MotoCourse';
 import { MemoryParcelles } from './MemoryParcelles';
+import DragRaceGame from '@/components/mini-games/DragRaceGame';
 import {
   Calendar,
   Trophy,
@@ -26,7 +27,7 @@ import {
 } from 'lucide-react';
 
 // Types
-type GameType = 'anneau_royal' | 'peche_parcelles' | 'moto_course' | 'memory_parcelles';
+type GameType = 'anneau_royal' | 'peche_parcelles' | 'moto_course' | 'memory_parcelles' | 'drag_race';
 
 interface GameInfo {
   id: GameType;
@@ -38,6 +39,14 @@ interface GameInfo {
 }
 
 const GAMES: GameInfo[] = [
+  {
+    id: 'drag_race',
+    name: 'Drag Race',
+    description: 'Passage de vitesses - Timing parfait = victoire !',
+    emoji: '🏁',
+    duration: 60,
+    color: 'red',
+  },
   {
     id: 'anneau_royal',
     name: 'Anneau Royal',
@@ -57,7 +66,7 @@ const GAMES: GameInfo[] = [
   {
     id: 'moto_course',
     name: 'Moto Course',
-    description: 'Course de moto 1v1 - Évitez les obstacles, collectez les pièces !',
+    description: 'Course de moto 1v1 - Passez les vitesses au bon moment !',
     emoji: '🏍️',
     duration: 45,
     color: 'orange',
@@ -103,6 +112,7 @@ export function MiniGamesPanel() {
   // Obtenir la couleur du jeu
   const getGameColorClass = (gameId: GameType) => {
     const colors: Record<GameType, string> = {
+      drag_race: 'border-red-500/30 hover:border-red-500/60',
       anneau_royal: 'border-yellow-500/30 hover:border-yellow-500/60',
       peche_parcelles: 'border-blue-500/30 hover:border-blue-500/60',
       moto_course: 'border-orange-500/30 hover:border-orange-500/60',
@@ -132,6 +142,7 @@ export function MiniGamesPanel() {
         </div>
 
         {/* Afficher le jeu sélectionné */}
+        {selectedGame === 'drag_race' && <DragRaceGame />}
         {selectedGame === 'anneau_royal' && <AnneauRoyal />}
         {selectedGame === 'peche_parcelles' && <PecheParcelles />}
         {selectedGame === 'moto_course' && <MotoCourse />}
