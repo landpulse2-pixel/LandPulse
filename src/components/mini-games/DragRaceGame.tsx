@@ -398,62 +398,65 @@ export default function DragRaceGame({
 
   // --- RENDU DÉCOR LATÉRAL ---
   const renderSideObject = (obj: SideObject) => {
-    if (obj.z < 0 || obj.z > 1) return null;
+    if (obj.z < 0.05 || obj.z > 0.95) return null;
     
-    // Perspective: les objets lointains sont plus haut et plus petits
-    const scale = 0.3 + obj.z * 0.7;
-    const yOffset = 220 - obj.z * 180; // plus loin = plus haut
-    const xOffset = obj.x * (60 + obj.z * 120); // écartement progressif
+    // Perspective: les objets proches sont en bas et grands, les lointains en haut et petits
+    const scale = 0.15 + obj.z * 0.5;
+    // baseY: 280 = tout en bas, 200 = horizon
+    const baseY = 280 - obj.z * 80; // les objets proches sont en bas (280), les lointains montent
+    const xOffset = obj.x * (30 + obj.z * 80); // écartement progressif
     
-    const opacity = Math.max(0, 1 - (obj.z - 0.8) * 2); // fade out proche
-    
-    const baseY = yOffset;
+    const opacity = Math.max(0.3, 1 - (obj.z - 0.7) * 1.5); // fade out quand très proche ou très loin
     
     if (obj.type === 'tree') {
+      const treeHeight = 50 * scale;
       return (
         <g key={`tree-${obj.lane}`} transform={`translate(${100 + xOffset}, ${baseY})`} opacity={opacity}>
-          {/* Tronc */}
-          <rect x={-3 * scale} y={0} width={6 * scale} height={30 * scale} fill="#5D4037" />
-          {/* Feuillage */}
-          <ellipse cx={0} cy={-10 * scale} rx={15 * scale} ry={20 * scale} fill="#2E7D32" />
-          <ellipse cx={-8 * scale} cy={0} rx={10 * scale} ry={12 * scale} fill="#388E3C" />
-          <ellipse cx={8 * scale} cy={0} rx={10 * scale} ry={12 * scale} fill="#388E3C" />
+          {/* Tronc - part du sol vers le haut */}
+          <rect x={-3 * scale} y={-treeHeight} width={6 * scale} height={treeHeight} fill="#5D4037" />
+          {/* Feuillage - au-dessus du tronc */}
+          <ellipse cx={0} cy={-treeHeight - 15 * scale} rx={12 * scale} ry={18 * scale} fill="#2E7D32" />
+          <ellipse cx={-6 * scale} cy={-treeHeight - 5 * scale} rx={8 * scale} ry={10 * scale} fill="#388E3C" />
+          <ellipse cx={6 * scale} cy={-treeHeight - 5 * scale} rx={8 * scale} ry={10 * scale} fill="#388E3C" />
         </g>
       );
     }
     
     if (obj.type === 'pole') {
+      const poleHeight = 40 * scale;
       return (
         <g key={`pole-${obj.lane}`} transform={`translate(${100 + xOffset}, ${baseY})`} opacity={opacity}>
-          {/* Poteau */}
-          <rect x={-2 * scale} y={-60 * scale} width={4 * scale} height={60 * scale} fill="#757575" />
+          {/* Poteau - part du sol */}
+          <rect x={-2 * scale} y={-poleHeight} width={4 * scale} height={poleHeight} fill="#757575" />
           {/* Lampe */}
-          <ellipse cx={0} cy={-65 * scale} rx={8 * scale} ry={5 * scale} fill="#FFD54F" />
-          <ellipse cx={0} cy={-65 * scale} rx={5 * scale} ry={3 * scale} fill="#FFEB3B" opacity="0.8" />
+          <ellipse cx={0} cy={-poleHeight - 5 * scale} rx={6 * scale} ry={4 * scale} fill="#FFD54F" />
+          <ellipse cx={0} cy={-poleHeight - 5 * scale} rx={4 * scale} ry={2.5 * scale} fill="#FFEB3B" opacity="0.8" />
         </g>
       );
     }
     
     if (obj.type === 'sign') {
+      const signHeight = 30 * scale;
       return (
         <g key={`sign-${obj.lane}`} transform={`translate(${100 + xOffset}, ${baseY})`} opacity={opacity}>
-          {/* Poteau */}
-          <rect x={-2 * scale} y={-40 * scale} width={4 * scale} height={40 * scale} fill="#757575" />
+          {/* Poteau - part du sol */}
+          <rect x={-2 * scale} y={-signHeight} width={4 * scale} height={signHeight} fill="#757575" />
           {/* Panneau */}
-          <rect x={-15 * scale} y={-55 * scale} width={30 * scale} height={18 * scale} rx={2} fill="#F44336" />
-          <text x={0} y={-43 * scale} textAnchor="middle" fill="white" fontSize={10 * scale} fontWeight="bold">STOP</text>
+          <rect x={-10 * scale} y={-signHeight - 15 * scale} width={20 * scale} height={12 * scale} rx={2} fill="#F44336" />
         </g>
       );
     }
     
     if (obj.type === 'building') {
+      const buildingHeight = 40 * scale;
+      const buildingWidth = 30 * scale;
       return (
         <g key={`building-${obj.lane}`} transform={`translate(${100 + xOffset}, ${baseY})`} opacity={opacity}>
-          {/* Bâtiment */}
-          <rect x={-20 * scale} y={-50 * scale} width={40 * scale} height={50 * scale} fill="#37474F" />
+          {/* Bâtiment - part du sol */}
+          <rect x={-buildingWidth/2} y={-buildingHeight} width={buildingWidth} height={buildingHeight} fill="#37474F" />
           {/* Fenêtres */}
-          {[0, 1, 2, 3].map(i => (
-            <rect key={i} x={-15 * scale + (i % 2) * 20 * scale} y={-45 * scale + Math.floor(i / 2) * 20 * scale} width={8 * scale} height={10 * scale} fill="#FFC107" opacity="0.7" />
+          {[0, 1, 2].map(i => (
+            <rect key={i} x={-buildingWidth/2 + 5 * scale + (i % 2) * 12 * scale} y={-buildingHeight + 5 * scale + Math.floor(i / 2) * 15 * scale} width={6 * scale} height={8 * scale} fill="#FFC107" opacity="0.7" />
           ))}
         </g>
       );
@@ -462,142 +465,47 @@ export default function DragRaceGame({
     return null;
   };
 
-  // --- RENDU MOTO VUE ARRIÈRE RÉALISTE ---
+  // --- RENDU MOTO VUE ARRIÈRE SIMPLIFIÉE ---
   const renderMotorcycle = () => {
     const motoColor = currentPlayer.id === 1 ? '#3b82f6' : '#ef4444';
-    const motoColorDark = currentPlayer.id === 1 ? '#1d4ed8' : '#b91c1c';
     const exhaustGlow = logicSpeed.current > 80;
     
     return (
-      <g transform="translate(100, 120)">
-        {/* Ombre au sol - agrandie avec la vitesse */}
-        <ellipse 
-          cx={0} 
-          cy={70} 
-          rx={35 + displaySpeed * 0.08} 
-          ry={10 + displaySpeed * 0.03} 
-          fill="black" 
-          opacity={0.4 + displaySpeed * 0.003} 
-        />
+      <g transform="translate(100, 140)">
+        {/* Ombre au sol */}
+        <ellipse cx={0} cy={50} rx={30 + displaySpeed * 0.05} ry={8} fill="black" opacity={0.35} />
         
-        {/* === ROUE ARRIÈRE (vue de derrière = cercle) === */}
-        <g transform="translate(0, 55)">
-          {/* Pneu - épaisseur vue de derrière */}
-          <circle cx={0} cy={0} r={28} fill="#1a1a1a" stroke="#333" strokeWidth={2} />
-          {/* Jante */}
-          <circle cx={0} cy={0} r={18} fill="#444" stroke="#666" strokeWidth={1} />
-          {/* Rayons qui tournent */}
-          <g style={{ transform: `rotate(${wheelRotation.current}deg)`, transformOrigin: '0 0' }}>
-            {[0, 45, 90, 135, 180, 225, 270, 315].map(angle => (
-              <line 
-                key={angle}
-                x1={0} y1={0} 
-                x2={14 * Math.cos(angle * Math.PI / 180)} 
-                y2={14 * Math.sin(angle * Math.PI / 180)}
-                stroke="#888" strokeWidth={2}
-              />
-            ))}
-          </g>
-          {/* Centre moyeu */}
-          <circle cx={0} cy={0} r={6} fill="#555" />
-          <circle cx={0} cy={0} r={3} fill="#333" />
-        </g>
+        {/* === ROUE ARRIÈRE (cercle vue de derrière) === */}
+        <circle cx={0} cy={40} r={22} fill="#1a1a1a" stroke="#333" strokeWidth={2} />
+        <circle cx={0} cy={40} r={14} fill="#444" />
+        <circle cx={0} cy={40} r={5} fill="#555" />
         
-        {/* === CHÂSSIS ARRIÈRE === */}
-        <path 
-          d={`M-25 35 Q0 15 25 35 L22 50 Q0 40 -22 50 Z`} 
-          fill={motoColor} 
-        />
-        <path 
-          d={`M-22 50 Q0 42 22 50 L18 58 Q0 52 -18 58 Z`} 
-          fill={motoColorDark} 
-        />
-        
-        {/* === SUSPENSION ARRIÈRE === */}
-        <rect x={-30} y={30} width={6} height={20} rx={2} fill="#555" />
-        <rect x={24} y={30} width={6} height={20} rx={2} fill="#555" />
-        
-        {/* === ÉCHAPPEMENTS (x2) === */}
-        <g transform="translate(-35, 40)">
-          <rect x={0} y={0} width={10} height={25} rx={3} fill="#666" />
-          <rect x={0} y={22} width={10} height={8} rx={2} fill="#444" />
-          {/* Flamme échappement si vitesse élevée */}
-          {exhaustGlow && (
-            <ellipse cx={5} cy={32} rx={6} ry={10} fill="#fbbf24" opacity={0.7} className="animate-pulse" />
-          )}
-        </g>
-        <g transform="translate(25, 40)">
-          <rect x={0} y={0} width={10} height={25} rx={3} fill="#666" />
-          <rect x={0} y={22} width={10} height={8} rx={2} fill="#444" />
-          {exhaustGlow && (
-            <ellipse cx={5} cy={32} rx={6} ry={10} fill="#fbbf24" opacity={0.7} className="animate-pulse" />
-          )}
-        </g>
+        {/* === CHÂSSIS + CARROSSERIE === */}
+        <path d={`M-20 25 Q0 10 20 25 L18 38 Q0 30 -18 38 Z`} fill={motoColor} />
         
         {/* === FEU ARRIÈRE === */}
-        <rect x={-18} y={15} width={36} height={10} rx={3} fill="#dc2626" />
-        <rect x={-14} y={17} width={28} height={6} rx={2} fill="#fca5a5" opacity="0.9" className="animate-pulse" />
-        {/* Feux stop plus lumineux */}
-        <circle cx={-10} cy={20} r={3} fill="#fff" opacity="0.5" />
-        <circle cx={10} cy={20} r={3} fill="#fff" opacity="0.5" />
+        <rect x={-12} y={10} width={24} height={8} rx={2} fill="#dc2626" />
         
-        {/* === PARTIE CENTRALE / RÉSERVOIR (caché par le pilote) === */}
-        <ellipse cx={0} cy={-5} rx={22} ry={15} fill={motoColor} />
-        
-        {/* === SIÈGE === */}
-        <path d={`M-18 -15 Q0 -25 18 -15 L15 -5 Q0 -10 -15 -5 Z`} fill="#1a1a1a" />
-        
-        {/* === RÉTROVISEURS === */}
-        <g transform="translate(-45, -35)">
-          <rect x={0} y={0} width={20} height={4} rx={1} fill="#333" />
-          <ellipse cx={22} cy={2} rx={8} ry={5} fill="#222" stroke="#444" strokeWidth={1} />
-          <ellipse cx={22} cy={2} rx={5} ry={3} fill="#60a5fa" opacity="0.4" />
-        </g>
-        <g transform="translate(45, -35)">
-          <rect x={-20} y={0} width={20} height={4} rx={1} fill="#333" />
-          <ellipse cx={-22} cy={2} rx={8} ry={5} fill="#222" stroke="#444" strokeWidth={1} />
-          <ellipse cx={-22} cy={2} rx={5} ry={3} fill="#60a5fa" opacity="0.4" />
-        </g>
-        
-        {/* === PILOTE (vue arrière) === */}
-        {/* Corps */}
-        <ellipse cx={0} cy={-20} rx={20} ry={25} fill="#1a1a1a" />
-        {/* Bras position conduite */}
-        <ellipse cx={-28} cy={-10} rx={8} ry={6} fill="#1a1a1a" />
-        <ellipse cx={28} cy={-10} rx={8} ry={6} fill="#1a1a1a" />
-        {/* Épaules */}
-        <ellipse cx={-12} cy={-30} rx={10} ry={8} fill="#1a1a1a" />
-        <ellipse cx={12} cy={-30} rx={10} ry={8} fill="#1a1a1a" />
-        
-        {/* === CASQUE === */}
-        <circle cx={0} cy={-50} r={18} fill="#111" stroke="#333" strokeWidth={2} />
-        {/* Marque/decoration casque */}
-        <path 
-          d={`M-12 -55 Q0 -60 12 -55`} 
-          fill="none" 
-          stroke={motoColor} 
-          strokeWidth={3} 
-        />
-        {/* Visière reflet */}
-        <ellipse cx={0} cy={-48} rx={12} ry={8} fill="#60a5fa" opacity="0.4" />
-        {/* Effet vitesse sur le casque */}
-        {displaySpeed > 100 && (
+        {/* === ÉCHAPPEMENTS === */}
+        <rect x={-28} y={30} width={8} height={18} rx={2} fill="#666" />
+        <rect x={20} y={30} width={8} height={18} rx={2} fill="#666" />
+        {exhaustGlow && (
           <>
-            <line x1={-20} y1={-50} x2={-30} y2={-48} stroke="#fff" strokeWidth={1} opacity={0.3} />
-            <line x1={20} y1={-50} x2={30} y2={-48} stroke="#fff" strokeWidth={1} opacity={0.3} />
+            <ellipse cx={-24} cy={50} rx={4} ry={8} fill="#fbbf24" opacity={0.6} className="animate-pulse" />
+            <ellipse cx={24} cy={50} rx={4} ry={8} fill="#fbbf24" opacity={0.6} className="animate-pulse" />
           </>
         )}
         
-        {/* === PARTICULES VITESSE === */}
-        {particles.current.map((p, i) => (
-          <circle 
-            key={i} 
-            cx={p.x - 100} 
-            cy={p.y - 120} 
-            r={2 + p.life * 3} 
-            fill={`rgba(251, 191, 36, ${p.life * 0.8})`} 
-          />
-        ))}
+        {/* === PILOTE (dos) === */}
+        <ellipse cx={0} cy={-15} rx={16} ry={20} fill="#1a1a1a" />
+        {/* Bras */}
+        <ellipse cx={-22} cy={-5} rx={6} ry={5} fill="#1a1a1a" />
+        <ellipse cx={22} cy={-5} rx={6} ry={5} fill="#1a1a1a" />
+        
+        {/* === CASQUE === */}
+        <circle cx={0} cy={-40} r={14} fill="#111" stroke="#333" strokeWidth={2} />
+        <path d={`M-8 -44 Q0 -48 8 -44`} fill="none" stroke={motoColor} strokeWidth={2} />
+        <ellipse cx={0} cy={-38} rx={8} ry={5} fill="#60a5fa" opacity="0.3" />
       </g>
     );
   };
