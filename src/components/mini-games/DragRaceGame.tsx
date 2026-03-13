@@ -15,6 +15,14 @@ const AI_SKILL_LEVELS = {
 };
 type AISkill = keyof typeof AI_SKILL_LEVELS;
 
+// --- DÉCORS LATÉRAUX ---
+type SideObject = {
+  x: number;      // position horizontale (-1 = gauche, 1 = droite)
+  z: number;      // profondeur (0 = loin, 1 = proche)
+  type: 'tree' | 'pole' | 'sign' | 'building';
+  lane: number;   // numéro de lane pour varier
+};
+
 export default function DragRaceGame({ 
   onDuelComplete,
   players: initialPlayers,
@@ -60,6 +68,10 @@ export default function DragRaceGame({
   const particles = useRef<Array<{x: number, y: number, life: number, speed: number}>>([]);
   const [speedLinesOpacity, setSpeedLinesOpacity] = useState(0);
   
+  // --- DÉCORS LATÉRAUX ---
+  const sideObjects = useRef<SideObject[]>([]);
+  const wheelRotation = useRef(0);
+  
   // --- IA RÉFÉRENCES ---
   const aiShiftTimeout = useRef<NodeJS.Timeout | null>(null);
   const aiCurrentGear = useRef(0);
@@ -71,6 +83,20 @@ export default function DragRaceGame({
   const MAX_RPM = 8000;
   const GEAR_COUNT = 5;
   const FINISH_LINE = 400;
+
+  // --- INITIALISER DÉCORS ---
+  const initSideObjects = () => {
+    const objects: SideObject[] = [];
+    for (let i = 0; i < 30; i++) {
+      objects.push({
+        x: Math.random() > 0.5 ? -1 : 1,
+        z: i / 30,
+        type: ['tree', 'pole', 'sign', 'building'][Math.floor(Math.random() * 4)] as SideObject['type'],
+        lane: i
+      });
+    }
+    sideObjects.current = objects;
+  };
 
   // --- FONCTION SHIFT GEAR ---
   const executeShiftGear = useCallback(() => {
@@ -138,6 +164,18 @@ export default function DragRaceGame({
     roadOffset.current = (roadOffset.current + speedFactor) % 100;
     barrierOffset.current = (barrierOffset.current + speedFactor * 0.7) % 50;
     cloudOffset.current = (cloudOffset.current + speedFactor * 0.1) % 200;
+    
+    // Rotation roue
+    wheelRotation.current = (wheelRotation.current + speedFactor * 3) % 360;
+    
+    // Mise à jour décors latéraux
+    sideObjects.current = sideObjects.current.map(obj => {
+      let newZ = obj.z + speedFactor * 0.003;
+      if (newZ > 1.2) {
+        newZ = -0.2;
+      }
+      return { ...obj, z: newZ };
+    });
 
     // Particules
     if (logicSpeed.current > 30 && Math.random() > 0.7) {
@@ -235,7 +273,7 @@ export default function DragRaceGame({
         if (aiCurrentGear.current < GEAR_COUNT) {
           scheduleAIShift(aiCurrentGear.current);
         }
-      }, reactionDelay + gearNum * 300); // Délai progressif par rapport
+      }, reactionDelay + gearNum * 300);
     };
     
     // Démarrer la course IA après un délai
@@ -290,6 +328,8 @@ export default function DragRaceGame({
     barrierOffset.current = 0;
     cloudOffset.current = 0;
     particles.current = [];
+    wheelRotation.current = 0;
+    initSideObjects();
     setDisplayRPM(0);
     setDisplaySpeed(0);
     setDisplayDistance(0);
@@ -355,6 +395,212 @@ export default function DragRaceGame({
   // RPM angle clamped
   const rawAngle = (displayRPM / MAX_RPM) * 180 - 90;
   const rpmAngle = Math.min(Math.max(rawAngle, -90), 90);
+
+  // --- RENDU DÉCOR LATÉRAL ---
+  const renderSideObject = (obj: SideObject) => {
+    if (obj.z < 0 || obj.z > 1) return null;
+    
+    // Perspective: les objets lointains sont plus haut et plus petits
+    const scale = 0.3 + obj.z * 0.7;
+    const yOffset = 220 - obj.z * 180; // plus loin = plus haut
+    const xOffset = obj.x * (60 + obj.z * 120); // écartement progressif
+    
+    const opacity = Math.max(0, 1 - (obj.z - 0.8) * 2); // fade out proche
+    
+    const baseY = yOffset;
+    
+    if (obj.type === 'tree') {
+      return (
+        <g key={`tree-${obj.lane}`} transform={`translate(${100 + xOffset}, ${baseY})`} opacity={opacity}>
+          {/* Tronc */}
+          <rect x={-3 * scale} y={0} width={6 * scale} height={30 * scale} fill="#5D4037" />
+          {/* Feuillage */}
+          <ellipse cx={0} cy={-10 * scale} rx={15 * scale} ry={20 * scale} fill="#2E7D32" />
+          <ellipse cx={-8 * scale} cy={0} rx={10 * scale} ry={12 * scale} fill="#388E3C" />
+          <ellipse cx={8 * scale} cy={0} rx={10 * scale} ry={12 * scale} fill="#388E3C" />
+        </g>
+      );
+    }
+    
+    if (obj.type === 'pole') {
+      return (
+        <g key={`pole-${obj.lane}`} transform={`translate(${100 + xOffset}, ${baseY})`} opacity={opacity}>
+          {/* Poteau */}
+          <rect x={-2 * scale} y={-60 * scale} width={4 * scale} height={60 * scale} fill="#757575" />
+          {/* Lampe */}
+          <ellipse cx={0} cy={-65 * scale} rx={8 * scale} ry={5 * scale} fill="#FFD54F" />
+          <ellipse cx={0} cy={-65 * scale} rx={5 * scale} ry={3 * scale} fill="#FFEB3B" opacity="0.8" />
+        </g>
+      );
+    }
+    
+    if (obj.type === 'sign') {
+      return (
+        <g key={`sign-${obj.lane}`} transform={`translate(${100 + xOffset}, ${baseY})`} opacity={opacity}>
+          {/* Poteau */}
+          <rect x={-2 * scale} y={-40 * scale} width={4 * scale} height={40 * scale} fill="#757575" />
+          {/* Panneau */}
+          <rect x={-15 * scale} y={-55 * scale} width={30 * scale} height={18 * scale} rx={2} fill="#F44336" />
+          <text x={0} y={-43 * scale} textAnchor="middle" fill="white" fontSize={10 * scale} fontWeight="bold">STOP</text>
+        </g>
+      );
+    }
+    
+    if (obj.type === 'building') {
+      return (
+        <g key={`building-${obj.lane}`} transform={`translate(${100 + xOffset}, ${baseY})`} opacity={opacity}>
+          {/* Bâtiment */}
+          <rect x={-20 * scale} y={-50 * scale} width={40 * scale} height={50 * scale} fill="#37474F" />
+          {/* Fenêtres */}
+          {[0, 1, 2, 3].map(i => (
+            <rect key={i} x={-15 * scale + (i % 2) * 20 * scale} y={-45 * scale + Math.floor(i / 2) * 20 * scale} width={8 * scale} height={10 * scale} fill="#FFC107" opacity="0.7" />
+          ))}
+        </g>
+      );
+    }
+    
+    return null;
+  };
+
+  // --- RENDU MOTO VUE ARRIÈRE RÉALISTE ---
+  const renderMotorcycle = () => {
+    const motoColor = currentPlayer.id === 1 ? '#3b82f6' : '#ef4444';
+    const motoColorDark = currentPlayer.id === 1 ? '#1d4ed8' : '#b91c1c';
+    const exhaustGlow = logicSpeed.current > 80;
+    
+    return (
+      <g transform="translate(100, 120)">
+        {/* Ombre au sol - agrandie avec la vitesse */}
+        <ellipse 
+          cx={0} 
+          cy={70} 
+          rx={35 + displaySpeed * 0.08} 
+          ry={10 + displaySpeed * 0.03} 
+          fill="black" 
+          opacity={0.4 + displaySpeed * 0.003} 
+        />
+        
+        {/* === ROUE ARRIÈRE (vue de derrière = cercle) === */}
+        <g transform="translate(0, 55)">
+          {/* Pneu - épaisseur vue de derrière */}
+          <circle cx={0} cy={0} r={28} fill="#1a1a1a" stroke="#333" strokeWidth={2} />
+          {/* Jante */}
+          <circle cx={0} cy={0} r={18} fill="#444" stroke="#666" strokeWidth={1} />
+          {/* Rayons qui tournent */}
+          <g style={{ transform: `rotate(${wheelRotation.current}deg)`, transformOrigin: '0 0' }}>
+            {[0, 45, 90, 135, 180, 225, 270, 315].map(angle => (
+              <line 
+                key={angle}
+                x1={0} y1={0} 
+                x2={14 * Math.cos(angle * Math.PI / 180)} 
+                y2={14 * Math.sin(angle * Math.PI / 180)}
+                stroke="#888" strokeWidth={2}
+              />
+            ))}
+          </g>
+          {/* Centre moyeu */}
+          <circle cx={0} cy={0} r={6} fill="#555" />
+          <circle cx={0} cy={0} r={3} fill="#333" />
+        </g>
+        
+        {/* === CHÂSSIS ARRIÈRE === */}
+        <path 
+          d={`M-25 35 Q0 15 25 35 L22 50 Q0 40 -22 50 Z`} 
+          fill={motoColor} 
+        />
+        <path 
+          d={`M-22 50 Q0 42 22 50 L18 58 Q0 52 -18 58 Z`} 
+          fill={motoColorDark} 
+        />
+        
+        {/* === SUSPENSION ARRIÈRE === */}
+        <rect x={-30} y={30} width={6} height={20} rx={2} fill="#555" />
+        <rect x={24} y={30} width={6} height={20} rx={2} fill="#555" />
+        
+        {/* === ÉCHAPPEMENTS (x2) === */}
+        <g transform="translate(-35, 40)">
+          <rect x={0} y={0} width={10} height={25} rx={3} fill="#666" />
+          <rect x={0} y={22} width={10} height={8} rx={2} fill="#444" />
+          {/* Flamme échappement si vitesse élevée */}
+          {exhaustGlow && (
+            <ellipse cx={5} cy={32} rx={6} ry={10} fill="#fbbf24" opacity={0.7} className="animate-pulse" />
+          )}
+        </g>
+        <g transform="translate(25, 40)">
+          <rect x={0} y={0} width={10} height={25} rx={3} fill="#666" />
+          <rect x={0} y={22} width={10} height={8} rx={2} fill="#444" />
+          {exhaustGlow && (
+            <ellipse cx={5} cy={32} rx={6} ry={10} fill="#fbbf24" opacity={0.7} className="animate-pulse" />
+          )}
+        </g>
+        
+        {/* === FEU ARRIÈRE === */}
+        <rect x={-18} y={15} width={36} height={10} rx={3} fill="#dc2626" />
+        <rect x={-14} y={17} width={28} height={6} rx={2} fill="#fca5a5" opacity="0.9" className="animate-pulse" />
+        {/* Feux stop plus lumineux */}
+        <circle cx={-10} cy={20} r={3} fill="#fff" opacity="0.5" />
+        <circle cx={10} cy={20} r={3} fill="#fff" opacity="0.5" />
+        
+        {/* === PARTIE CENTRALE / RÉSERVOIR (caché par le pilote) === */}
+        <ellipse cx={0} cy={-5} rx={22} ry={15} fill={motoColor} />
+        
+        {/* === SIÈGE === */}
+        <path d={`M-18 -15 Q0 -25 18 -15 L15 -5 Q0 -10 -15 -5 Z`} fill="#1a1a1a" />
+        
+        {/* === RÉTROVISEURS === */}
+        <g transform="translate(-45, -35)">
+          <rect x={0} y={0} width={20} height={4} rx={1} fill="#333" />
+          <ellipse cx={22} cy={2} rx={8} ry={5} fill="#222" stroke="#444" strokeWidth={1} />
+          <ellipse cx={22} cy={2} rx={5} ry={3} fill="#60a5fa" opacity="0.4" />
+        </g>
+        <g transform="translate(45, -35)">
+          <rect x={-20} y={0} width={20} height={4} rx={1} fill="#333" />
+          <ellipse cx={-22} cy={2} rx={8} ry={5} fill="#222" stroke="#444" strokeWidth={1} />
+          <ellipse cx={-22} cy={2} rx={5} ry={3} fill="#60a5fa" opacity="0.4" />
+        </g>
+        
+        {/* === PILOTE (vue arrière) === */}
+        {/* Corps */}
+        <ellipse cx={0} cy={-20} rx={20} ry={25} fill="#1a1a1a" />
+        {/* Bras position conduite */}
+        <ellipse cx={-28} cy={-10} rx={8} ry={6} fill="#1a1a1a" />
+        <ellipse cx={28} cy={-10} rx={8} ry={6} fill="#1a1a1a" />
+        {/* Épaules */}
+        <ellipse cx={-12} cy={-30} rx={10} ry={8} fill="#1a1a1a" />
+        <ellipse cx={12} cy={-30} rx={10} ry={8} fill="#1a1a1a" />
+        
+        {/* === CASQUE === */}
+        <circle cx={0} cy={-50} r={18} fill="#111" stroke="#333" strokeWidth={2} />
+        {/* Marque/decoration casque */}
+        <path 
+          d={`M-12 -55 Q0 -60 12 -55`} 
+          fill="none" 
+          stroke={motoColor} 
+          strokeWidth={3} 
+        />
+        {/* Visière reflet */}
+        <ellipse cx={0} cy={-48} rx={12} ry={8} fill="#60a5fa" opacity="0.4" />
+        {/* Effet vitesse sur le casque */}
+        {displaySpeed > 100 && (
+          <>
+            <line x1={-20} y1={-50} x2={-30} y2={-48} stroke="#fff" strokeWidth={1} opacity={0.3} />
+            <line x1={20} y1={-50} x2={30} y2={-48} stroke="#fff" strokeWidth={1} opacity={0.3} />
+          </>
+        )}
+        
+        {/* === PARTICULES VITESSE === */}
+        {particles.current.map((p, i) => (
+          <circle 
+            key={i} 
+            cx={p.x - 100} 
+            cy={p.y - 120} 
+            r={2 + p.life * 3} 
+            fill={`rgba(251, 191, 36, ${p.life * 0.8})`} 
+          />
+        ))}
+      </g>
+    );
+  };
 
   // --- RENDU LOBBY ---
   if (gameState === 'LOBBY') {
@@ -581,94 +827,111 @@ export default function DragRaceGame({
       </div>
       
       {/* Zone de course 3D */}
-      <div className="relative h-72 bg-gray-900 overflow-hidden">
-        {/* Ciel + nuages */}
-        <div className="absolute top-0 w-full h-2/3 bg-gradient-to-b from-sky-900 via-purple-900 to-gray-900">
+      <div className="relative h-80 bg-gray-900 overflow-hidden">
+        {/* Ciel couchant */}
+        <div className="absolute top-0 w-full h-1/2 bg-gradient-to-b from-orange-400 via-orange-500 to-pink-500">
+          {/* Soleil couchant */}
+          <div className="absolute top-8 left-1/2 -translate-x-1/2 w-20 h-20 bg-yellow-300 rounded-full blur-md opacity-80" />
+          {/* Nuages */}
           <div 
-            className="absolute w-full h-full opacity-30"
+            className="absolute w-full h-full"
             style={{ 
-              backgroundImage: 'radial-gradient(ellipse at center, rgba(255,255,255,0.15) 0%, transparent 70%)',
-              backgroundSize: '200px 100px',
-              backgroundPosition: `${cloudOffset.current}px 30px, ${cloudOffset.current * 0.5 + 100}px 60px`
+              backgroundImage: `
+                radial-gradient(ellipse 80px 30px at ${20 + cloudOffset.current * 0.5}% 40%, rgba(255,255,255,0.3) 0%, transparent 70%),
+                radial-gradient(ellipse 60px 20px at ${70 - cloudOffset.current * 0.3}% 50%, rgba(255,255,255,0.2) 0%, transparent 70%)
+              `,
+            }}
+          />
+        </div>
+
+        {/* Sol herbe sur les côtés */}
+        <div className="absolute bottom-0 w-full h-2/3">
+          {/* Herbe gauche */}
+          <div 
+            className="absolute left-0 w-1/4 h-full bg-gradient-to-t from-green-800 to-green-700"
+            style={{
+              backgroundImage: `repeating-linear-gradient(90deg, transparent 0px, transparent 10px, rgba(0,0,0,0.1) 10px, rgba(0,0,0,0.1) 20px)`
+            }}
+          />
+          {/* Herbe droite */}
+          <div 
+            className="absolute right-0 w-1/4 h-full bg-gradient-to-t from-green-800 to-green-700"
+            style={{
+              backgroundImage: `repeating-linear-gradient(90deg, transparent 0px, transparent 10px, rgba(0,0,0,0.1) 10px, rgba(0,0,0,0.1) 20px)`
             }}
           />
         </div>
 
         {/* Route perspective */}
         <div 
-          className="absolute bottom-0 w-full h-2/3 origin-bottom"
-          style={{ transform: 'perspective(600px) rotateX(55deg)', transformStyle: 'preserve-3d' }}
+          className="absolute bottom-0 left-1/2 -translate-x-1/2 w-3/5 h-2/3 origin-bottom"
+          style={{ transform: 'perspective(400px) rotateX(60deg)', transformStyle: 'preserve-3d' }}
         >
           <div 
-            className="w-[200%] h-full mx-[-50%] bg-[#1a1a2e]"
+            className="w-full h-full bg-[#2a2a2a]"
             style={{
               backgroundImage: `
-                linear-gradient(90deg, transparent 49%, rgba(255,255,255,0.3) 49%, rgba(255,255,255,0.3) 51%, transparent 51%),
-                repeating-linear-gradient(to bottom, #16213e 0px, #16213e 40px, #1a1a3a 40px, #1a1a3a 80px)
+                linear-gradient(90deg, #dc2626 0%, #dc2626 3%, #333 3%, #333 97%, #dc2626 97%, #dc2626 100%),
+                repeating-linear-gradient(to bottom, transparent 0px, transparent 40px, rgba(255,255,255,0.1) 40px, rgba(255,255,255,0.1) 42px)
               `,
-              backgroundSize: '100% 80px, 100% 80px',
-              backgroundPosition: `center ${roadOffset.current}px`,
+              backgroundSize: '100% 100%, 100% 80px',
+              backgroundPosition: `0 0, 0 ${roadOffset.current}px`,
             }}
           />
+          {/* Ligne centrale pointillée */}
           <div 
-            className="absolute left-1/2 -translate-x-1/2 w-2 h-full"
+            className="absolute left-1/2 -translate-x-1/2 w-1 h-full"
             style={{
               backgroundImage: 'linear-gradient(to bottom, #fff 50%, transparent 50%)',
-              backgroundSize: '100% 60px',
+              backgroundSize: '100% 40px',
               backgroundPosition: `0 ${roadOffset.current}px`
             }}
           />
-          <div className="absolute left-0 w-8 h-full" style={{
-            backgroundImage: 'repeating-linear-gradient(45deg, #dc2626 0px, #dc2626 15px, #fff 15px, #fff 30px)',
-            backgroundSize: '100% 30px',
-            backgroundPosition: `0 ${barrierOffset.current}px`
-          }} />
-          <div className="absolute right-0 w-8 h-full" style={{
-            backgroundImage: 'repeating-linear-gradient(45deg, #dc2626 0px, #dc2626 15px, #fff 15px, #fff 30px)',
-            backgroundSize: '100% 30px',
-            backgroundPosition: `0 ${barrierOffset.current}px`
-          }} />
         </div>
+
+        {/* Bandes latérales rouge/blanc */}
+        <div 
+          className="absolute bottom-0 left-[18%] w-4 h-48 origin-bottom"
+          style={{ 
+            backgroundImage: 'repeating-linear-gradient(0deg, #dc2626 0px, #dc2626 15px, #fff 15px, #fff 30px)',
+            backgroundSize: '100% 30px',
+            backgroundPosition: `0 ${barrierOffset.current}px`,
+            transform: 'perspective(400px) rotateX(60deg)'
+          }}
+        />
+        <div 
+          className="absolute bottom-0 right-[18%] w-4 h-48 origin-bottom"
+          style={{ 
+            backgroundImage: 'repeating-linear-gradient(0deg, #dc2626 0px, #dc2626 15px, #fff 15px, #fff 30px)',
+            backgroundSize: '100% 30px',
+            backgroundPosition: `0 ${barrierOffset.current}px`,
+            transform: 'perspective(400px) rotateX(60deg)'
+          }}
+        />
+
+        {/* === DÉCORS LATÉRAUX SVG === */}
+        <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 200 300">
+          {sideObjects.current.map(renderSideObject)}
+        </svg>
 
         {/* Speed lines */}
         <div 
           className="absolute inset-0 pointer-events-none z-15"
           style={{
             opacity: speedLinesOpacity,
-            backgroundImage: 'repeating-linear-gradient(180deg, transparent 0px, rgba(255,255,255,0.05) 2px, transparent 4px)',
-            backgroundSize: '100% 20px',
-            animation: gameState === 'RACING' ? 'speedLines 0.05s linear infinite' : 'none'
+            backgroundImage: 'repeating-linear-gradient(180deg, transparent 0px, rgba(255,255,255,0.08) 2px, transparent 4px)',
+            backgroundSize: '100% 15px',
+            animation: gameState === 'RACING' ? 'speedLines 0.04s linear infinite' : 'none'
           }}
         />
 
         {/* Moto SVG */}
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 w-40 h-40 z-20">
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-56 h-56 z-20">
           <svg viewBox="0 0 200 200" className="w-full h-full drop-shadow-2xl">
-            <ellipse cx="100" cy="180" rx={40 + displaySpeed * 0.05} ry={8 + displaySpeed * 0.02} fill="black" opacity={0.3 + displaySpeed * 0.002} />
-            <g style={{ transformOrigin: '100px 160px', transform: `rotate(${roadOffset.current * 2}deg)` }}>
-              <circle cx="100" cy="160" r="22" fill="#1f2937" stroke="#4b5563" strokeWidth="3" />
-              <circle cx="100" cy="160" r="8" fill="#9ca3af" />
-              {[0, 60, 120].map(angle => (
-                <line key={angle} x1="100" y1="160" x2={100 + 18 * Math.cos(angle * Math.PI / 180)} y2={160 + 18 * Math.sin(angle * Math.PI / 180)} stroke="#6b7280" strokeWidth="2" />
-              ))}
-            </g>
-            <path d="M70 140 Q100 120 130 140 L125 155 Q100 145 75 155 Z" fill={currentPlayer.id === 1 ? '#3b82f6' : '#ef4444'} />
-            <path d="M75 155 Q100 150 125 155 L120 165 Q100 160 80 165 Z" fill={currentPlayer.id === 1 ? '#2563eb' : '#dc2626'} />
-            {logicSpeed.current > 80 && (
-              <><ellipse cx="69" cy="172" rx="6" ry="10" fill="#fbbf24" opacity="0.8" className="animate-pulse" /><ellipse cx="131" cy="172" rx="6" ry="10" fill="#fbbf24" opacity="0.8" className="animate-pulse" /></>
-            )}
-            <rect x="65" y="145" width="8" height="25" rx="2" fill="#6b7280" />
-            <rect x="127" y="145" width="8" height="25" rx="2" fill="#6b7280" />
-            <rect x="85" y="130" width="30" height="12" rx="3" fill="#ef4444" className="animate-pulse" />
-            <ellipse cx="100" cy="100" rx="18" ry="22" fill="#1f2937" />
-            <circle cx="100" cy="82" r="16" fill="#111827" stroke="#4b5563" strokeWidth="2" />
-            <ellipse cx="100" cy="80" rx="10" ry="6" fill="#60a5fa" opacity="0.6" />
-            {particles.current.map((p, i) => (
-              <circle key={i} cx={p.x} cy={p.y} r={3 + p.life * 4} fill={`rgba(251, 191, 36, ${p.life * 0.8})`} />
-            ))}
+            {renderMotorcycle()}
           </svg>
-          {(shiftQuality === 'BAD' || displaySpeed > 120) && (
-            <div className={`absolute inset-0 ${displaySpeed > 120 ? 'animate-[shake_0.05s_ease-in-out_infinite]' : 'animate-[shake_0.1s_ease-in-out_3]'}`} />
+          {(shiftQuality === 'BAD' || displaySpeed > 130) && (
+            <div className={`absolute inset-0 ${displaySpeed > 130 ? 'animate-[shake_0.03s_ease-in-out_infinite]' : 'animate-[shake_0.1s_ease-in-out_3]'}`} />
           )}
         </div>
 
@@ -692,9 +955,9 @@ export default function DragRaceGame({
       </div>
 
       {/* Tableau de bord */}
-      <div className="p-5 bg-gradient-to-b from-gray-800 to-gray-900 text-white">
+      <div className="p-4 bg-gradient-to-b from-gray-800 to-gray-900 text-white">
         {/* RPM Gauge */}
-        <div className="relative w-52 h-28 mx-auto mb-5">
+        <div className="relative w-48 h-24 mx-auto mb-4">
           <svg viewBox="0 0 220 120" className="w-full h-full">
             <path d="M20,100 A90,90 0 0,1 200,100" fill="none" stroke="#374151" strokeWidth="12" strokeLinecap="round" />
             <path d="M20,100 A90,90 0 0,1 110,20" fill="none" stroke="#22c55e" strokeWidth="12" strokeDasharray="140" opacity="0.7" />
@@ -712,23 +975,23 @@ export default function DragRaceGame({
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-3 mb-5">
-          <div className="bg-gray-700/50 rounded-xl p-3 text-center border border-gray-600">
+        <div className="grid grid-cols-3 gap-2 mb-4">
+          <div className="bg-gray-700/50 rounded-xl p-2 text-center border border-gray-600">
             <div className="text-gray-400 text-xs font-semibold">VITESSE</div>
-            <div className="text-2xl font-black text-white">{Math.floor(displaySpeed)} <span className="text-sm text-gray-400">km/h</span></div>
+            <div className="text-xl font-black text-white">{Math.floor(displaySpeed)} <span className="text-xs text-gray-400">km/h</span></div>
           </div>
-          <div className="bg-gray-700/50 rounded-xl p-3 text-center border border-gray-600">
+          <div className="bg-gray-700/50 rounded-xl p-2 text-center border border-gray-600">
             <div className="text-gray-400 text-xs font-semibold">RAPPORT</div>
-            <div className={`text-4xl font-black ${gear >= 5 ? 'text-purple-400' : 'text-yellow-400'}`}>{gear === 0 ? 'N' : gear}</div>
+            <div className={`text-3xl font-black ${gear >= 5 ? 'text-purple-400' : 'text-yellow-400'}`}>{gear === 0 ? 'N' : gear}</div>
           </div>
-          <div className="bg-gray-700/50 rounded-xl p-3 text-center border border-gray-600">
+          <div className="bg-gray-700/50 rounded-xl p-2 text-center border border-gray-600">
             <div className="text-gray-400 text-xs font-semibold">DISTANCE</div>
-            <div className="text-2xl font-black text-white">{displayDistance} <span className="text-sm text-gray-400">m</span></div>
+            <div className="text-xl font-black text-white">{displayDistance} <span className="text-xs text-gray-400">m</span></div>
           </div>
         </div>
 
         {/* Shift bar */}
-        <div className="relative h-10 bg-gray-700 rounded-full overflow-hidden border-2 border-gray-600 mb-4">
+        <div className="relative h-8 bg-gray-700 rounded-full overflow-hidden border-2 border-gray-600 mb-3">
           <div className="absolute left-[45%] w-[45%] h-full bg-yellow-500/20" />
           <div className="absolute left-[62%] w-[16%] h-full bg-green-500/40 border-x-2 border-green-300" />
           <div className="absolute top-1 bottom-1 w-1.5 bg-white rounded-full shadow-[0_0_12px_white]" style={{ left: `${shiftBarPos.current}%` }} />
@@ -739,18 +1002,18 @@ export default function DragRaceGame({
         <button
           onClick={gameState === 'RACING' ? executeShiftGear : undefined}
           disabled={gameState === 'COUNTDOWN'}
-          className={`w-full py-4 rounded-xl font-black text-lg uppercase tracking-widest transition-all duration-150 active:scale-[0.98] disabled:opacity-50 bg-gradient-to-r ${playerColor} hover:opacity-90 shadow-[0_4px_20px_rgba(0,0,0,0.3)]`}
+          className={`w-full py-3 rounded-xl font-black text-base uppercase tracking-widest transition-all duration-150 active:scale-[0.98] disabled:opacity-50 bg-gradient-to-r ${playerColor} hover:opacity-90 shadow-[0_4px_20px_rgba(0,0,0,0.3)]`}
         >
           {gameState === 'COUNTDOWN' ? '⏱ ...' : `⚡ PASSER LA ${gear + 1}ÈME !`}
         </button>
         
-        <div className="text-center mt-3 text-gray-500 text-xs">
+        <div className="text-center mt-2 text-gray-500 text-xs">
           Clique ou Espace/Entrée pour shift • Zone verte = Perfect
         </div>
       </div>
 
       <style jsx>{`
-        @keyframes speedLines { from { background-position: 0 0; } to { background-position: 0 20px; } }
+        @keyframes speedLines { from { background-position: 0 0; } to { background-position: 0 15px; } }
         @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-2px) rotate(-0.5deg); } 75% { transform: translateX(2px) rotate(0.5deg); } }
       `}</style>
     </div>
